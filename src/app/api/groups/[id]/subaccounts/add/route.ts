@@ -1,7 +1,9 @@
-import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { verifyJwtToken } from "@/lib/jwt";
+import {
+  getAuthorizationContext,
+  requirePermission,
+} from "@/lib/auth/authorization";
 import { AuditAction } from "@prisma/client";
 
 /**
@@ -13,36 +15,11 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const token = request.cookies.get("token")?.value;
-    if (!token) {
-      return NextResponse.json(
-        { success: false, error: "Unauthorized" },
-        { status: 401 },
-      );
-    }
-
-    let authenticatedUserId: string;
-    let role: string;
-    try {
-      const decoded = await verifyJwtToken(token);
-      authenticatedUserId = decoded.userId;
-      role = decoded.role;
-    } catch {
-      return NextResponse.json(
-        { success: false, error: "Invalid token" },
-        { status: 401 },
-      );
-    }
-
-    if (!isStaffRole(role)) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Forbidden: Only Admin/Super Admin can manage groups",
-        },
-        { status: 403 },
-      );
-    }
+    const ctx = await getAuthorizationContext(request);
+    if ("response" in ctx) return ctx.response;
+    const denied = requirePermission(ctx, "customer_groups.edit");
+    if (denied) return denied;
+    const authenticatedUserId = ctx.userId;
 
     const { id: groupId } = await params;
     const { poolAuthId, userId } = await request.json();

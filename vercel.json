@@ -64,6 +64,11 @@
       "path": "/api/cron_guild_confirmations",
       "schedule": "15 * * * *",
       "requestMethod": "GET"
+    },
+    "binance-subaccount-unlock": {
+      "path": "/api/cron_binance_subaccount_unlock",
+      "schedule": "* * * * *",
+      "requestMethod": "GET"
     }
   },
   "$schema": "https://openapi.vercel.sh/vercel.json",
