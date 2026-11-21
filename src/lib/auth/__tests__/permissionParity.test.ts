@@ -385,6 +385,51 @@ const ROUTES: ParityRow[] = [
     permissions: ["customer_groups.edit"],
     today: "staff",
   },
+
+  // Analytics. The client-facing payback-config, payback-history and
+  // pool-hashprice-live (any signed-in account) stay unchanged.
+  {
+    route: "admin/payback-config",
+    method: "GET",
+    permissions: ["customer_payback.view"],
+    today: "staff",
+  },
+  {
+    route: "admin/payback-config",
+    method: "PATCH",
+    permissions: ["customer_payback.edit_settings"],
+    today: "staff",
+  },
+  {
+    route: "admin/payback-config-company",
+    method: "GET",
+    permissions: ["company_payback.view"],
+    today: "staff",
+  },
+  {
+    route: "admin/payback-config-company",
+    method: "PATCH",
+    permissions: ["company_payback.edit_settings"],
+    today: "staff",
+  },
+  {
+    route: "payback-config-company",
+    method: "GET",
+    permissions: ["company_payback.view"],
+    today: "staff",
+  },
+  {
+    route: "payback-history-company",
+    method: "GET",
+    permissions: ["company_payback.view"],
+    today: "staff",
+  },
+  {
+    route: "admin/payback-history/backfill",
+    method: "POST",
+    permissions: ["company_payback.edit_settings"],
+    today: "staff",
+  },
 ];
 
 const SYSTEM_ROLES = ["SUPER_ADMIN", "ADMIN", "ACCOUNTING"] as const;
