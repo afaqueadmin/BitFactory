@@ -87,6 +87,7 @@ export function useCreateSecondaryLoginRequest() {
     }) => post("/api/secondary-login-requests", input),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [QUERY_KEY] });
+      queryClient.invalidateQueries({ queryKey: ["badge-counts"] });
     },
   });
 }
@@ -95,6 +96,7 @@ export function useReviewSecondaryLoginRequest() {
   const queryClient = useQueryClient();
   const onSuccess = () => {
     queryClient.invalidateQueries({ queryKey: [QUERY_KEY] });
+    queryClient.invalidateQueries({ queryKey: ["badge-counts"] });
   };
 
   const approveMutation = useMutation({

@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { fetchAuthCheck } from "@/lib/authCheck";
 
 const PASSKEY_OFFER_FLAG = "bf_offer_passkey_setup";
 
@@ -77,15 +78,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       // First check auth status with no-cache headers
       console.log("Checking auth status...");
-      const authCheck = await fetch("/api/auth/check", {
-        credentials: "include",
-        headers: {
-          "Cache-Control": "no-cache, no-store, must-revalidate",
-          Pragma: "no-cache",
-        },
-      });
-
-      const authData = await authCheck.json();
+      const authCheck = await fetchAuthCheck();
+      const authData = authCheck.data ?? {};
       console.log("Auth check response:", authData);
 
       if (!authCheck.ok) {

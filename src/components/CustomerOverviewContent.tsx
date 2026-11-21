@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useUser } from "@/lib/hooks/useUser";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
@@ -151,26 +152,10 @@ export default function CustomerOverviewContent() {
     totalMiners: 0,
   });
 
-  // Fetch current user profile
-  const { data: profileData, isLoading: profileLoading } = useQuery({
-    queryKey: ["userProfile"],
-    queryFn: async () => {
-      const response = await fetch("/api/user/profile", {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-        },
-      });
+  // Current user (shared with the rest of the app - one /api/user/profile call)
+  const { user: currentUser, loading: profileLoading } = useUser();
 
-      if (!response.ok) {
-        throw new Error("Failed to fetch user profile");
-      }
-
-      return response.json();
-    },
-  });
-
-  const currentUserRole = profileData?.user?.role || "ADMIN";
+  const currentUserRole = currentUser?.role || "ADMIN";
 
   // Fetch all users
   const {

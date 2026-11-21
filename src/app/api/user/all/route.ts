@@ -62,63 +62,73 @@ export async function GET(request: NextRequest) {
     };
 
     // Fetch all users (excluding passwords)
-    const users = await prisma.user.findMany({
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        role: true,
-        city: true,
-        country: true,
-        phoneNumber: true,
-        companyName: true,
-        twoFactorAuths: {
-          where: { login: { isPrimary: true } },
-          select: { enabled: true },
-        },
-        streetAddress: true,
-        createdAt: true,
-        isDeleted: true,
-        franchiseeId: true,
-        segment: true,
-        miners: {
-          where: {
-            isDeleted: false,
-          },
+    console.time("user/all findMany");
+    const [users, balances, totalRevenue] = await Promise.all([
+      prisma.user
+        .findMany({
           select: {
             id: true,
-          },
-        },
-        poolAuths: {
-          orderBy: { createdAt: "asc" },
-          select: {
-            authKey: true,
-            pool: { select: { name: true } },
-          },
-        },
-        costPayments: {
-          where: {
-            type: {
-              notIn: NON_BALANCE_PAYMENT_TYPES, // Exclude hardware sales & repair from the running balance amount
+            email: true,
+            name: true,
+            role: true,
+            city: true,
+            country: true,
+            phoneNumber: true,
+            companyName: true,
+            twoFactorAuths: {
+              where: { login: { isPrimary: true } },
+              select: { enabled: true },
             },
-            isDeleted: false,
+            streetAddress: true,
+            createdAt: true,
+            isDeleted: true,
+            franchiseeId: true,
+            segment: true,
+            _count: {
+              select: { miners: { where: { isDeleted: false } } },
+            },
+            poolAuths: {
+              orderBy: { createdAt: "asc" },
+              select: {
+                authKey: true,
+                pool: { select: { name: true } },
+              },
+            },
           },
-          select: {
-            amount: true,
+          where,
+          orderBy: {
+            createdAt: "desc",
           },
+        })
+        .finally(() => console.timeEnd("user/all findMany")),
+      // Balance per user, summed in the database. Excludes hardware sales &
+      // repair from the running balance amount.
+      prisma.costPayment.groupBy({
+        by: ["userId"],
+        where: {
+          type: { notIn: NON_BALANCE_PAYMENT_TYPES },
+          isDeleted: false,
         },
-      },
-      where,
-      orderBy: {
-        createdAt: "desc",
-      },
-    });
+        _sum: { amount: true },
+      }),
+      prisma.costPayment.aggregate({
+        where: {
+          type: "PAYMENT",
+          isDeleted: false,
+        },
+        _sum: {
+          amount: true,
+        },
+      }),
+    ]);
+
+    const balanceByUser = new Map(
+      balances.map((b) => [b.userId, b._sum.amount ?? 0]),
+    );
 
     // Transform the data to include miner count and aggregate amount
     const transformedUsers = users.map((user) => {
-      const aggregateAmount = user.costPayments
-        .reduce((sum: number, payment) => sum + (payment.amount || 0), 0)
-        .toFixed(2);
+      const aggregateAmount = (balanceByUser.get(user.id) ?? 0).toFixed(2);
 
       return {
         id: user.id,
@@ -140,23 +150,13 @@ export async function GET(request: NextRequest) {
         // The primary login's 2FA (a secondary login has its own).
         twoFactorEnabled: user.twoFactorAuths[0]?.enabled ?? false,
         joinDate: user.createdAt.toISOString().split("T")[0],
-        miners: user.miners.length,
+        miners: user._count.miners,
         status: user.isDeleted ? "deleted" : "active",
         isDeleted: user.isDeleted,
         franchiseeId: user.franchiseeId,
         segment: user.segment,
         balance: aggregateAmount,
       };
-    });
-
-    const totalRevenue = await prisma.costPayment.aggregate({
-      where: {
-        type: "PAYMENT",
-        isDeleted: false,
-      },
-      _sum: {
-        amount: true,
-      },
     });
 
     return NextResponse.json(

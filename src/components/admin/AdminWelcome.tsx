@@ -12,16 +12,8 @@
 import React from "react";
 import Link from "next/link";
 import { Box, Typography } from "@mui/material";
-import {
-  useUser,
-  useTickets,
-  useWalletChangeRequests,
-  usePaymentFrequencyChangeRequests,
-  useFirmwareChangeRequests,
-  useSecondaryLoginRequests,
-  useHashrateAlerts,
-} from "@/lib/hooks";
-import { useSimulationRequestCount } from "@/lib/hooks/useSimulationRequestCount";
+import { useUser } from "@/lib/hooks";
+import { useBadgeCounts } from "@/lib/hooks/useBadgeCounts";
 import { focusRing, useDaylight } from "@/lib/daylight";
 
 // 5:00-11:59 morning, 12:00-16:59 afternoon, otherwise evening (no "good
@@ -38,21 +30,7 @@ const plural = (n: number, one: string, many = `${one}s`) =>
 export default function AdminWelcome() {
   const { d, fonts } = useDaylight();
   const { user } = useUser();
-  const { tickets, loading: l1 } = useTickets({ status: "OPEN" });
-  const { alerts, loading: l2 } = useHashrateAlerts({ acknowledged: false });
-  const { requests: wallet, loading: l3 } = useWalletChangeRequests({
-    status: "PENDING",
-  });
-  const { requests: frequency, loading: l4 } =
-    usePaymentFrequencyChangeRequests({ status: "PENDING" });
-  const { requests: firmware, loading: l5 } = useFirmwareChangeRequests({
-    status: "PENDING",
-  });
-  const { requests: logins, loading: l6 } = useSecondaryLoginRequests({
-    status: "PENDING",
-  });
-  const simulation = useSimulationRequestCount();
-  const loading = l1 || l2 || l3 || l4 || l5 || l6;
+  const { counts, loading } = useBadgeCounts();
 
   const [greeting, setGreeting] = React.useState<string | null>(null);
   React.useEffect(() => {
@@ -68,38 +46,38 @@ export default function AdminWelcome() {
 
   const items = [
     {
-      n: tickets.length,
-      label: plural(tickets.length, "support ticket"),
+      n: counts.tickets,
+      label: plural(counts.tickets, "support ticket"),
       href: "/tickets",
     },
     {
-      n: alerts.length,
-      label: plural(alerts.length, "hashrate alert"),
+      n: counts.hashrateAlerts,
+      label: plural(counts.hashrateAlerts, "hashrate alert"),
       href: "/hashrate-alerts",
     },
     {
-      n: wallet.length,
-      label: plural(wallet.length, "wallet request"),
+      n: counts.walletRequests,
+      label: plural(counts.walletRequests, "wallet request"),
       href: "/wallets?tab=change-requests",
     },
     {
-      n: frequency.length,
-      label: plural(frequency.length, "payment frequency request"),
+      n: counts.frequencyRequests,
+      label: plural(counts.frequencyRequests, "payment frequency request"),
       href: "/wallets?tab=frequency",
     },
     {
-      n: firmware.length,
-      label: plural(firmware.length, "firmware change request"),
+      n: counts.firmwareRequests,
+      label: plural(counts.firmwareRequests, "firmware change request"),
       href: "/firmware-change-requests",
     },
     {
-      n: logins.length,
-      label: plural(logins.length, "sign-in email request"),
+      n: counts.loginRequests,
+      label: plural(counts.loginRequests, "sign-in email request"),
       href: "/secondary-login-requests",
     },
     {
-      n: simulation,
-      label: plural(simulation, "simulated account request"),
+      n: counts.simulationRequests,
+      label: plural(counts.simulationRequests, "simulated account request"),
       href: "/simulated-accounts",
     },
   ].filter((i) => i.n > 0);

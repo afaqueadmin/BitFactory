@@ -116,6 +116,7 @@ export function useTicket(id: string) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["ticket", id] });
       queryClient.invalidateQueries({ queryKey: ["tickets"] });
+      queryClient.invalidateQueries({ queryKey: ["badge-counts"] });
     },
   });
 
@@ -136,6 +137,7 @@ export function useTicket(id: string) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["ticket", id] });
       queryClient.invalidateQueries({ queryKey: ["tickets"] });
+      queryClient.invalidateQueries({ queryKey: ["badge-counts"] });
     },
   });
 
@@ -156,6 +158,7 @@ export function useTicket(id: string) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["ticket", id] });
       queryClient.invalidateQueries({ queryKey: ["tickets"] });
+      queryClient.invalidateQueries({ queryKey: ["badge-counts"] });
     },
   });
 
@@ -176,6 +179,7 @@ export function useTicket(id: string) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["ticket", id] });
       queryClient.invalidateQueries({ queryKey: ["tickets"] });
+      queryClient.invalidateQueries({ queryKey: ["badge-counts"] });
     },
   });
 
@@ -221,6 +225,7 @@ export function useCreateTicket() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["tickets"] });
+      queryClient.invalidateQueries({ queryKey: ["badge-counts"] });
     },
   });
 }
