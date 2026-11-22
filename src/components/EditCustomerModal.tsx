@@ -1,5 +1,6 @@
 "use client";
 
+import { can } from "@/lib/auth/can";
 import React, { useState, useEffect } from "react";
 import {
   Dialog,
@@ -414,7 +415,7 @@ export default function EditCustomerModal({
                 setFormData((prev) => ({ ...prev, email: e.target.value }))
               }
               required
-              disabled={user ? user.role !== "SUPER_ADMIN" : true}
+              disabled={!can(user, "customers.change_email")}
             />
             {/* The account's sign-in emails: the primary above, plus an
                 optional second one. Saved on its own, not by Update. */}

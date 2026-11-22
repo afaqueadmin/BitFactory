@@ -1,5 +1,6 @@
 "use client";
 
+import { can } from "@/lib/auth/can";
 import React, { useState, useEffect } from "react";
 import {
   Dialog,
@@ -392,10 +393,10 @@ export default function CreateUserModal({
               >
                 <MenuItem value="CLIENT">Client</MenuItem>
                 <MenuItem value="SIMULATED">Simulated</MenuItem>
-                {user && user.role === "SUPER_ADMIN" && (
+                {can(user, "customers.create_staff") && (
                   <MenuItem value="ADMIN">Admin</MenuItem>
                 )}
-                {user && user.role === "SUPER_ADMIN" && (
+                {can(user, "customers.create_staff") && (
                   <MenuItem value="ACCOUNTING">Accounting</MenuItem>
                 )}
               </Select>

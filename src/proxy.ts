@@ -1,4 +1,6 @@
 import { isStaffRole } from "@/lib/auth/staffRoles";
+import { loadPermissions } from "@/lib/auth/authorization";
+import { canOpenPage, pagePermissions } from "@/lib/auth/pagePermissions";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { JwtPayload, decodeSessionClaims, verifyJwtToken } from "@/lib/jwt";
@@ -134,7 +136,7 @@ const securePaths = {
     "/simulated-accounts",
     "/guilds",
     "/guild-requests",
-    "/access-rules", // SUPER_ADMIN only - the page and its APIs check the role
+    "/access-rules", // access_rules.view (SUPER_ADMIN only), see pagePermissions
     // Add admin-specific public paths if any
   ]),
   // Franchisee: their own dashboard/account/customers/miners pages under
@@ -324,6 +326,17 @@ export async function proxy(request: NextRequest) {
       // Prevent staff from accessing client routes
       if (!isInRouteGroup(pathname, role)) {
         return NextResponse.redirect(new URL("/adminpanel", request.url));
+      }
+      // RBAC: the page's permission (src/lib/auth/pagePermissions.ts), with
+      // permissions read from the database. Fails closed.
+      if (pagePermissions(pathname) !== "always") {
+        const loaded = await loadPermissions(decoded.userId).catch((error) => {
+          console.error("Loading permissions failed:", error);
+          return null;
+        });
+        if (!canOpenPage(loaded?.permissions, pathname)) {
+          return NextResponse.redirect(new URL("/adminpanel", request.url));
+        }
       }
     }
 

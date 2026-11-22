@@ -1,10 +1,11 @@
+import { can } from "@/lib/auth/can";
 /**
  * src/app/(manage)/accounting/hardware-repair/[id]/page.tsx
  * Hardware Repair Invoice Detail Page
  *
  * Display full invoice details for hardware repair invoices
  */
-"use client";
+("use client");
 
 import { BankEffectNotice } from "@/components/accounting/common/BankEffectNotice";
 import { CONFIRM_BANK_EFFECT, useBankEffect } from "@/lib/hooks/useBankEffect";
@@ -160,7 +161,7 @@ export default function HardwareRepairInvoiceDetailPage() {
   }, [invoice?.user?.id]);
 
   const isAdmin = isStaffRole(user?.role);
-  const isSuperAdmin = user?.role === "SUPER_ADMIN";
+  const canMarkUnpaid = can(user, "invoicing.mark_unpaid");
 
   const isPastDate = (dateStr: string) => {
     if (!dateStr) return false;
@@ -750,7 +751,7 @@ export default function HardwareRepairInvoiceDetailPage() {
                     Record Payment
                   </Button>
 
-                  {isSuperAdmin && invoice.status === "PAID" && (
+                  {canMarkUnpaid && invoice.status === "PAID" && (
                     <Button
                       sx={{ displayPrint: "none" }}
                       variant="outlined"

@@ -1,10 +1,11 @@
+import { can } from "@/lib/auth/can";
 /**
  * src/app/(manage)/accounting/hardware-sales/[id]/page.tsx
  * Hardware Sales Invoice Detail Page
  *
  * Display full invoice details for hardware sales invoices
  */
-"use client";
+("use client");
 
 import { BankEffectNotice } from "@/components/accounting/common/BankEffectNotice";
 import { CONFIRM_BANK_EFFECT, useBankEffect } from "@/lib/hooks/useBankEffect";
@@ -147,7 +148,7 @@ export default function InvoiceDetailPage() {
   }, [invoice?.user?.id]);
 
   const isAdmin = isStaffRole(user?.role);
-  const isSuperAdmin = user?.role === "SUPER_ADMIN";
+  const canMarkUnpaid = can(user, "invoicing.mark_unpaid");
 
   const isPastDate = (dateStr: string) => {
     if (!dateStr) return false;
@@ -700,7 +701,7 @@ export default function InvoiceDetailPage() {
                     Record Payment
                   </Button>
 
-                  {isSuperAdmin && invoice.status === "PAID" && (
+                  {canMarkUnpaid && invoice.status === "PAID" && (
                     <Button
                       sx={{ displayPrint: "none" }}
                       variant="outlined"

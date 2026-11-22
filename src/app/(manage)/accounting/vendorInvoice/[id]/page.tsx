@@ -1,5 +1,6 @@
 "use client";
 
+import { can } from "@/lib/auth/can";
 import { BankEffectNotice } from "@/components/accounting/common/BankEffectNotice";
 import { CONFIRM_BANK_EFFECT, useBankEffect } from "@/lib/hooks/useBankEffect";
 import {
@@ -83,7 +84,7 @@ export default function VendorInvoiceDetailPage() {
     openUnpaidDialog ? `/api/vendor-invoices/${invoiceId}/mark-unpaid` : null,
   );
   const { user } = useUser();
-  const isSuperAdmin = user?.role === "SUPER_ADMIN";
+  const canMarkUnpaid = can(user, "farm_tariffs.mark_unpaid");
 
   // Fetch invoice details
   useEffect(() => {
@@ -578,7 +579,7 @@ export default function VendorInvoiceDetailPage() {
                   onCancelClick={() => setOpenCancelDialog(true)}
                 />
 
-                {isSuperAdmin && invoice.paymentStatus === "Paid" && (
+                {canMarkUnpaid && invoice.paymentStatus === "Paid" && (
                   <Button
                     variant="outlined"
                     color="warning"
