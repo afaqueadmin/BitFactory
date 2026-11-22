@@ -1,3 +1,4 @@
+import { can } from "@/lib/auth/can";
 /**
  * src/app/(manage)/franchisees/page.tsx
  * Franchisee Management Page
@@ -5,7 +6,7 @@
  * Admin page for viewing franchises and creating new franchisees.
  */
 
-"use client";
+("use client");
 
 import { isStaffRole } from "@/lib/auth/staffRoles";
 import React, { useState, useEffect, useCallback } from "react";
@@ -94,7 +95,7 @@ interface ApiResponse<T = Record<string, unknown>> {
 export default function FranchiseesPage() {
   const router = useRouter();
   const { user } = useUser();
-  const isSuperAdmin = user?.role === "SUPER_ADMIN";
+  const canDelete = can(user, "franchisees.delete");
   const isAdmin = isStaffRole(user?.role);
   const { d, fonts } = useDaylight();
   const ds = useDaylightAdminSx();
@@ -489,7 +490,7 @@ export default function FranchiseesPage() {
               </ListItemIcon>
               <ListItemText>Manage Incentives</ListItemText>
             </MenuItem>
-            {isSuperAdmin && (
+            {canDelete && (
               <MenuItem
                 onClick={() => {
                   setDeleteError("");

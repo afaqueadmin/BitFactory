@@ -1,5 +1,6 @@
 "use client";
 
+import { can } from "@/lib/auth/can";
 import { BankEffectNotice } from "@/components/accounting/common/BankEffectNotice";
 import { CONFIRM_BANK_EFFECT, useBankEffect } from "@/lib/hooks/useBankEffect";
 import {
@@ -87,7 +88,7 @@ export default function HardwarePurchaseDetailPage() {
       : null,
   );
   const { user } = useUser();
-  const isSuperAdmin = user?.role === "SUPER_ADMIN";
+  const canMarkUnpaid = can(user, "hardware_purchases.mark_unpaid");
 
   // Fetch invoice details
   useEffect(() => {
@@ -618,7 +619,7 @@ export default function HardwarePurchaseDetailPage() {
                   onCancelClick={() => setOpenCancelDialog(true)}
                 />
 
-                {isSuperAdmin && invoice.paymentStatus === "Paid" && (
+                {canMarkUnpaid && invoice.paymentStatus === "Paid" && (
                   <Button
                     variant="outlined"
                     color="warning"

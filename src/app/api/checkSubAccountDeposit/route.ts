@@ -102,7 +102,9 @@ export async function GET(req: NextRequest) {
   const startTime = invoice.binanceCheckoutStartedAt.getTime() - CLOCK_SKEW_MS;
 
   const generalOrSubBinanceAccountUrl =
-    email === "hamzanajeebmusic@gmail.com" ? "hisrec" : "subHisrec";
+    email === process.env.BINANCE_GENERAL_ACCOUNT_EMAIL
+      ? "hisrec"
+      : "subHisrec";
 
   let deposits: SubAccountDeposit[];
   try {

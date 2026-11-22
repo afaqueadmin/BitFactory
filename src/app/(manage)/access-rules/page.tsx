@@ -1,5 +1,6 @@
 "use client";
 
+import { can } from "@/lib/auth/can";
 /**
  * Access Rules (SUPER_ADMIN only): office hours and the office-passkey rule
  * for ADMIN and ACCOUNTING accounts, live extra time and requests for it,
@@ -194,7 +195,7 @@ export default function AccessRulesPage() {
   const ds = useDaylightAdminSx();
   const { user } = useUser();
   const queryClient = useQueryClient();
-  const isSuperAdmin = user?.role === "SUPER_ADMIN";
+  const isSuperAdmin = can(user, "access_rules.view");
 
   const { data, isLoading, error } = useQuery<Overview>({
     queryKey: ["staff-access"],

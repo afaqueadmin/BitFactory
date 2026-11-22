@@ -1,6 +1,9 @@
 import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
-import { requireStaffPermission } from "@/lib/auth/authorization";
+import {
+  loadPermissions,
+  requireStaffPermission,
+} from "@/lib/auth/authorization";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
 import { resolveLuxorSubaccounts } from "@/lib/luxorSubaccounts";
@@ -166,6 +169,16 @@ export async function GET(request: NextRequest) {
     // 2FA this reports - the signed-in one.
     const twoFactorEnabled = login?.twoFactorAuth?.enabled ?? false;
 
+    // RBAC: the caller's own permissions, for the admin sidebar and buttons.
+    // Never another account's (?customerId=). They only hide UI; every API
+    // checks again.
+    const permissions = customerId
+      ? []
+      : [
+          ...((await loadPermissions(userId).catch(() => null))?.permissions ??
+            []),
+        ];
+
     return Response.json(
       {
         user: {
@@ -173,6 +186,7 @@ export async function GET(request: NextRequest) {
           loginEmail: login?.email ?? user.email,
           secondaryEmails,
           twoFactorEnabled,
+          permissions,
           // M-1: when set, the account must enable 2FA by this date (shown
           // as a reminder in the app); null once it's enabled.
           twoFactorRequiredBy:

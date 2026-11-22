@@ -32,6 +32,9 @@ interface UserData {
     | "GUILDMASTER"
     | "GUILDMEMBER";
   twoFactorEnabled: boolean;
+  /** RBAC permission names (staff only; empty for other accounts). Hides UI
+   *  only: the APIs check again. */
+  permissions?: string[];
   /** ISO date by which this account must enable 2FA; null if not needed. */
   twoFactorRequiredBy?: string | null;
 }

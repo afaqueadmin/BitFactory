@@ -1,5 +1,6 @@
 "use client";
 
+import { can } from "@/lib/auth/can";
 import React, { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Box, Button, TextField, MenuItem, Typography } from "@mui/material";
@@ -86,7 +87,7 @@ export default function AdminTicketDetailPage() {
         currentUserId={user.id || ""}
         currentUserRole={user.role}
         headerExtra={
-          user.role === "SUPER_ADMIN" ? (
+          can(user, "tickets.assign") ? (
             <Box>
               <Typography
                 variant="caption"

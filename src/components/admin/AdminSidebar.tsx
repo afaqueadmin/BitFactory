@@ -87,6 +87,7 @@ import {
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useUser } from "@/lib/hooks";
+import { canOpenPage } from "@/lib/auth/pagePermissions";
 import { useBadgeCounts } from "@/lib/hooks/useBadgeCounts";
 import { useAdminNav } from "@/lib/contexts/admin-nav-context";
 import { focusRing, useDaylight } from "@/lib/daylight";
@@ -108,11 +109,6 @@ interface SidebarItem {
   // e.g. hosting invoice detail pages at /accounting/[id].
   activeMatch?: RegExp[];
   items?: SidebarItem[];
-  // Roles allowed to see this item. Defaults to every staff role (today's
-  // behavior) when omitted, so existing items don't need to be touched.
-  // FRANCHISEE no longer renders this sidebar at all — they get their own
-  // dedicated FranchiseSidebar under the (franchise) route group.
-  roles?: Array<"ADMIN" | "SUPER_ADMIN" | "ACCOUNTING">;
   openInNewTab?: boolean;
   badgeKey?: BadgeKey;
 }
@@ -427,7 +423,6 @@ const sidebarSections: SidebarSection[] = [
         title: "Access Rules (Incomplete - In Progress)",
         icon: <AccessRulesIcon />,
         path: "/access-rules",
-        roles: ["SUPER_ADMIN"],
         badgeKey: "access",
       },
       {
@@ -530,10 +525,10 @@ export default function AdminSidebar() {
 
   const visibleSections = React.useMemo(() => {
     const isAllowed = (item: SidebarItem) => {
-      if (!user) return false;
-      return item.roles
-        ? (item.roles as string[]).includes(user.role)
-        : isStaffRole(user.role);
+      if (!user || !isStaffRole(user.role)) return false;
+      // A group shows when any child does (below); a page item when its page
+      // opens for this user (the same map the proxy enforces).
+      return !item.path || canOpenPage(user.permissions, item.path);
     };
     const filterItems = (items: SidebarItem[]): SidebarItem[] =>
       items.filter(isAllowed).flatMap((item) => {
