@@ -69,6 +69,7 @@ import {
   History as ActivityLogIcon,
   FactCheck as AuditLogIcon,
   ManageAccounts as AccessRulesIcon,
+  AdminPanelSettings as RolesIcon,
   Dataset as DbDataIcon,
   ListAlt as SubaccountRecordsIcon,
   ShowChart as DailySnapshotsIcon,
@@ -425,6 +426,7 @@ const sidebarSections: SidebarSection[] = [
         path: "/access-rules",
         badgeKey: "access",
       },
+      { title: "Roles", icon: <RolesIcon />, path: "/roles" },
       {
         title: "DB Data Management",
         icon: <DbDataIcon />,

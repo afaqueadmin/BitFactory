@@ -6,6 +6,8 @@ import { useQuery } from "@tanstack/react-query";
 import AdminStatCard from "@/components/admin/AdminStatCard";
 import AdminValueCard from "@/components/admin/AdminValueCard";
 import AdminWelcome from "@/components/admin/AdminWelcome";
+import { useUser } from "@/lib/hooks";
+import { can } from "@/lib/auth/can";
 import { Box, CircularProgress, Alert } from "@mui/material";
 import Segmented from "@/components/daylight/Segmented";
 import { RADIUS_CONTROL, useDaylight } from "@/lib/daylight";
@@ -123,7 +125,45 @@ interface HardwareRevenueData {
   hardwareRevenue: number;
 }
 
+/**
+ * /adminpanel is always open to staff (everyone lands here), but the figures
+ * need dashboard.view. Without it only the welcome header shows, and none of
+ * the dashboard data is requested.
+ */
 export default function AdminDashboard() {
+  const { user, loading } = useUser();
+  const { d, fonts } = useDaylight();
+  if (loading || !user) {
+    return (
+      <Box sx={{ p: 4, display: "flex", justifyContent: "center" }}>
+        <CircularProgress sx={{ color: d.action }} />
+      </Box>
+    );
+  }
+  if (!can(user, "dashboard.view")) {
+    return (
+      <Box
+        sx={{
+          p: { xs: "24px 16px", sm: "28px 24px", md: "32px 36px" },
+          backgroundColor: d.canvas,
+          minHeight: "100%",
+          fontFamily: fonts.body,
+          color: d.text,
+        }}
+      >
+        <Box sx={{ maxWidth: 1400, mx: "auto" }}>
+          <AdminWelcome />
+          <Box sx={{ mt: 2, color: d.muted }}>
+            Use the menu to open the pages you have access to.
+          </Box>
+        </Box>
+      </Box>
+    );
+  }
+  return <DashboardContent />;
+}
+
+function DashboardContent() {
   const router = useRouter();
   const { d, fonts } = useDaylight();
   const [poolMode, setPoolMode] = useState<"total" | "luxor" | "braiins">(

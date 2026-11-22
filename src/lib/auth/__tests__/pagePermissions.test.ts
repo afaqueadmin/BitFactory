@@ -32,9 +32,9 @@ function sidebarPaths(): string[] {
   return [...src.matchAll(/path: "(\/[^"]*)"/g)].map((m) => m[1]);
 }
 
-// Today every staff role opens every staff page, except /access-rules
-// (SUPER_ADMIN only).
-const SA_ONLY_PAGES = new Set(["/access-rules"]);
+// Today every staff role opens every staff page, except /access-rules and
+// /roles (SUPER_ADMIN only).
+const SA_ONLY_PAGES = new Set(["/access-rules", "/roles"]);
 
 describe("page permission map", () => {
   const pages = managePages();

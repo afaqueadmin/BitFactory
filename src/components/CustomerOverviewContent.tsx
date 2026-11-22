@@ -202,7 +202,11 @@ export default function CustomerOverviewContent() {
     let filteredUsers = usersData.users;
 
     // ADMIN (and ACCOUNTING) can see CLIENT, FRANCHISEE and guild users
-    if (currentUserRole === "ADMIN" || currentUserRole === "ACCOUNTING") {
+    if (
+      currentUserRole === "ADMIN" ||
+      currentUserRole === "ACCOUNTING" ||
+      currentUserRole === "STAFF"
+    ) {
       filteredUsers = usersData.users.filter(
         (user: FetchedUser) =>
           user.role === "CLIENT" ||
@@ -217,6 +221,7 @@ export default function CustomerOverviewContent() {
           user.role === "CLIENT" ||
           user.role === "ADMIN" ||
           user.role === "ACCOUNTING" ||
+          user.role === "STAFF" ||
           user.role === "FRANCHISEE" ||
           isGuildRole(user.role),
       );

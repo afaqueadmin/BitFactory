@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import type { Invoice } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
+import { requireStaffPermission } from "@/lib/auth/authorization";
 import { assertFranchiseeOwnsCustomer } from "@/lib/franchiseeScope";
 
 /** Loads an invoice if the caller is its customer, an admin, or the customer's franchisee. */
@@ -52,6 +53,11 @@ export async function getInvoiceForPayer(
     return {
       error: NextResponse.json({ error: "Forbidden" }, { status: 403 }),
     };
+  }
+  // RBAC: staff opening someone else's invoice need invoicing.view.
+  if (isAdmin && !isOwner && !isCustomersFranchisee) {
+    const denied = await requireStaffPermission(req, ["invoicing.view"]);
+    if (denied) return { error: denied };
   }
 
   return { invoice, userId: currentUser.userId };

@@ -128,6 +128,7 @@ const RULES: Rule[] = [
   [exact("/activity-log"), ["activity_log.view"]],
   [exact("/audit-log"), ["audit_log.view"]],
   [exact("/access-rules"), ["access_rules.view"]],
+  [exact("/roles"), ["roles.view"]],
   [under("/db-data-management"), ["db_data.view"]],
   [exact("/settings/payment"), ["payment_settings.view"]],
   [exact("/external-resource"), ["external_resources.view"]],

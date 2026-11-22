@@ -14,7 +14,12 @@ export function canManageAccount(
   targetRole: string,
 ): boolean {
   if (actorRole === "SUPER_ADMIN") return targetRole !== "SUPER_ADMIN";
-  if (actorRole === "ADMIN" || actorRole === "ACCOUNTING") {
+  // STAFF is a peer of ADMIN here; its permissions decide what it may do.
+  if (
+    actorRole === "ADMIN" ||
+    actorRole === "ACCOUNTING" ||
+    actorRole === "STAFF"
+  ) {
     return (
       targetRole === "CLIENT" ||
       targetRole === "FRANCHISEE" ||

@@ -28,6 +28,7 @@ import {
 export const RESTRICTABLE_ROLES: ReadonlySet<string> = new Set([
   "ADMIN",
   "ACCOUNTING",
+  "STAFF",
 ]);
 
 export type StaffAccessSnapshot = {
