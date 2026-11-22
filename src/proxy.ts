@@ -137,6 +137,7 @@ const securePaths = {
     "/guilds",
     "/guild-requests",
     "/access-rules", // access_rules.view (SUPER_ADMIN only), see pagePermissions
+    "/roles", // roles.view (SUPER_ADMIN only)
     // Add admin-specific public paths if any
   ]),
   // Franchisee: their own dashboard/account/customers/miners pages under
@@ -189,6 +190,7 @@ const getDefaultPathForRole = (role: string) => {
     case "ADMIN":
     case "SUPER_ADMIN":
     case "ACCOUNTING":
+    case "STAFF":
       return "/adminpanel";
     case "CLIENT":
     case "SIMULATED":

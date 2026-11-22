@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useAuth } from "@/lib/contexts/auth-context";
+import { can } from "@/lib/auth/can";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -48,7 +49,7 @@ export default function PaymentSettingsPage() {
 
   // Redirect non-admin users
   useEffect(() => {
-    if (user && user.role !== "ADMIN" && user.role !== "ACCOUNTING") {
+    if (user && !can(user, "payment_settings.view")) {
       router.push("/dashboard");
     }
   }, [user, router]);

@@ -399,6 +399,10 @@ export default function CreateUserModal({
                 {can(user, "customers.create_staff") && (
                   <MenuItem value="ACCOUNTING">Accounting</MenuItem>
                 )}
+                {/* Staff: no access of its own; give it roles on /roles. */}
+                {can(user, "customers.create_staff") && (
+                  <MenuItem value="STAFF">Staff</MenuItem>
+                )}
               </Select>
             </FormControl>
 

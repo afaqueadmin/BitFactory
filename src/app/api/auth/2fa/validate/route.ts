@@ -104,6 +104,7 @@ export async function POST(req: NextRequest) {
       case "ADMIN":
       case "SUPER_ADMIN":
       case "ACCOUNTING":
+      case "STAFF":
         redirectUrl = "/adminpanel";
         break;
       case "FRANCHISEE":

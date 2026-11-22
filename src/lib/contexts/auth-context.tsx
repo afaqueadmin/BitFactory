@@ -31,6 +31,8 @@ interface User {
   email: string;
   name?: string;
   role: string;
+  /** RBAC permission names from /api/auth/check. Hides UI only. */
+  permissions?: string[];
 }
 
 interface AuthContextType {

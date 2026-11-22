@@ -2328,6 +2328,43 @@ const ROUTES: ParityRow[] = [
     today: "staff",
     shared: true,
   },
+  // Role management (new in stage 5, SUPER_ADMIN only)
+  {
+    route: "admin/roles",
+    method: "GET",
+    permissions: ["roles.view"],
+    today: "super_admin",
+  },
+  {
+    route: "admin/roles",
+    method: "POST",
+    permissions: ["roles.manage"],
+    today: "super_admin",
+  },
+  {
+    route: "admin/roles/[id]",
+    method: "PUT",
+    permissions: ["roles.manage"],
+    today: "super_admin",
+  },
+  {
+    route: "admin/roles/[id]",
+    method: "DELETE",
+    permissions: ["roles.manage"],
+    today: "super_admin",
+  },
+  {
+    route: "admin/roles/[id]/assignments",
+    method: "POST",
+    permissions: ["roles.assign"],
+    today: "super_admin",
+  },
+  {
+    route: "admin/roles/[id]/assignments",
+    method: "DELETE",
+    permissions: ["roles.assign"],
+    today: "super_admin",
+  },
 ];
 
 const SYSTEM_ROLES = ["SUPER_ADMIN", "ADMIN", "ACCOUNTING"] as const;

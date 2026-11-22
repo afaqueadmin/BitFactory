@@ -17,6 +17,7 @@ const REQUIRED_ROLES = new Set([
   "SUPER_ADMIN",
   "ADMIN",
   "ACCOUNTING",
+  "STAFF",
   "FRANCHISEE",
   "CLIENT",
   "SIMULATED",

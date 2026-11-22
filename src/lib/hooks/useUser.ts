@@ -26,6 +26,7 @@ interface UserData {
     | "ADMIN"
     | "SUPER_ADMIN"
     | "ACCOUNTING"
+    | "STAFF"
     | "CLIENT"
     | "FRANCHISEE"
     | "SIMULATED"
