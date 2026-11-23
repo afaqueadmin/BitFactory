@@ -35,6 +35,8 @@ import {
 } from "@mui/icons-material";
 import AdminValueCard from "@/components/admin/AdminValueCard";
 import { formatValue } from "@/lib/helpers/formatValue";
+import { useUser } from "@/lib/hooks";
+import { can } from "@/lib/auth/can";
 import { DaylightThemedPage } from "@/components/daylight/DaylightMuiScope";
 
 type IncentiveType =
@@ -85,6 +87,7 @@ function describeRate(rate: IncentiveRate): string {
 
 export default function FranchiseIncentivesAdminPage() {
   const params = useParams();
+  const { user } = useUser();
   const router = useRouter();
   const queryClient = useQueryClient();
   const franchiseId = params.id as string;
@@ -316,13 +319,15 @@ export default function FranchiseIncentivesAdminPage() {
                 <Typography variant="h6" sx={{ fontWeight: 600 }}>
                   Incentive Rates
                 </Typography>
-                <Button
-                  variant="contained"
-                  startIcon={<AddIcon />}
-                  onClick={() => setRateModalOpen(true)}
-                >
-                  Add Rate
-                </Button>
+                {can(user, "franchisees.manage_incentive_rates") && (
+                  <Button
+                    variant="contained"
+                    startIcon={<AddIcon />}
+                    onClick={() => setRateModalOpen(true)}
+                  >
+                    Add Rate
+                  </Button>
+                )}
               </Stack>
 
               {currentRates.length === 0 ? (
@@ -458,26 +463,30 @@ export default function FranchiseIncentivesAdminPage() {
                     <MenuItem value="true">Paid</MenuItem>
                     <MenuItem value="false">Unpaid</MenuItem>
                   </TextField>
-                  <Button
-                    variant="outlined"
-                    disabled={selectedEntryIds.length === 0}
-                    onClick={() => {
-                      setPayoutMode("selected");
-                      setPayoutDialogOpen(true);
-                    }}
-                  >
-                    Pay Selected ({selectedEntryIds.length})
-                  </Button>
-                  <Button
-                    variant="contained"
-                    disabled={unpaidEntries.length === 0}
-                    onClick={() => {
-                      setPayoutMode("all");
-                      setPayoutDialogOpen(true);
-                    }}
-                  >
-                    Pay All Unpaid
-                  </Button>
+                  {can(user, "incentive_payouts.record") && (
+                    <>
+                      <Button
+                        variant="outlined"
+                        disabled={selectedEntryIds.length === 0}
+                        onClick={() => {
+                          setPayoutMode("selected");
+                          setPayoutDialogOpen(true);
+                        }}
+                      >
+                        Pay Selected ({selectedEntryIds.length})
+                      </Button>
+                      <Button
+                        variant="contained"
+                        disabled={unpaidEntries.length === 0}
+                        onClick={() => {
+                          setPayoutMode("all");
+                          setPayoutDialogOpen(true);
+                        }}
+                      >
+                        Pay All Unpaid
+                      </Button>
+                    </>
+                  )}
                 </Stack>
               </Stack>
 

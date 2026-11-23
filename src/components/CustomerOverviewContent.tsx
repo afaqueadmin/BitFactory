@@ -55,6 +55,7 @@ import EditFranchiseeModal from "@/components/EditFranchiseeModal";
 import ChangePasswordModal from "@/components/ChangePasswordModal";
 import ChangeAccountTypeModal from "@/components/ChangeAccountTypeModal";
 import { canManageAccount } from "@/lib/auth/accountTiers";
+import { can } from "@/lib/auth/can";
 import { RADIUS_CARD, useDaylight } from "@/lib/daylight";
 import { actsAsClient, isGuildRole } from "@/lib/customerRoles";
 import {
@@ -559,14 +560,17 @@ export default function CustomerOverviewContent() {
         title="Customer Overview"
         description="Every customer, franchisee and simulated account, with balances, miners and status."
         actions={
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={() => setCreateModalOpen(true)}
-            sx={ds.primaryBtnSx}
-          >
-            Create User
-          </Button>
+          (can(currentUser, "customers.create") ||
+            can(currentUser, "customers.create_staff")) && (
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={() => setCreateModalOpen(true)}
+              sx={ds.primaryBtnSx}
+            >
+              Create User
+            </Button>
+          )
         }
       />
 
@@ -1138,54 +1142,64 @@ export default function CustomerOverviewContent() {
           },
         }}
       >
-        <MenuItem onClick={handleEditCustomer}>Edit Customer</MenuItem>
-        <MenuItem onClick={handleChangePassword}>Change Password</MenuItem>
-        <MenuItem
-          onClick={handleSignOutEverywhere}
-          disabled={!canManage(selectedCustomer)}
-        >
-          Sign Out All Devices
-        </MenuItem>
-        {(selectedCustomer?.role === "CLIENT" ||
-          selectedCustomer?.role === "FRANCHISEE") && (
-          <MenuItem
-            onClick={() => handleChangeAccountType("FRANCHISEE")}
-            disabled={
-              selectedCustomer.isDeleted || !canManage(selectedCustomer)
-            }
-          >
-            {selectedCustomer.role === "FRANCHISEE"
-              ? "Change to Regular Customer"
-              : "Change to Franchisee"}
-          </MenuItem>
+        {can(currentUser, "customers.edit") && (
+          <MenuItem onClick={handleEditCustomer}>Edit Customer</MenuItem>
         )}
-        {selectedCustomer?.role === "CLIENT" && (
-          <MenuItem
-            onClick={() => handleChangeAccountType("SIMULATED")}
-            disabled={
-              selectedCustomer.isDeleted || !canManage(selectedCustomer)
-            }
-          >
-            Change to Simulated Account
-          </MenuItem>
+        {can(currentUser, "customers.reset_password") && (
+          <MenuItem onClick={handleChangePassword}>Change Password</MenuItem>
         )}
-        {selectedCustomer?.isDeleted ? (
+        {can(currentUser, "customers.sign_out") && (
           <MenuItem
-            onClick={handleRestoreCustomer}
-            sx={{ color: `${d.success} !important` }}
+            onClick={handleSignOutEverywhere}
             disabled={!canManage(selectedCustomer)}
           >
-            Restore Customer
-          </MenuItem>
-        ) : (
-          <MenuItem
-            onClick={handleDeleteCustomer}
-            sx={{ color: `${d.danger} !important` }}
-            disabled={!selectedCustomer || !canManage(selectedCustomer)}
-          >
-            Delete Customer
+            Sign Out All Devices
           </MenuItem>
         )}
+        {can(currentUser, "customers.change_account_type") &&
+          (selectedCustomer?.role === "CLIENT" ||
+            selectedCustomer?.role === "FRANCHISEE") && (
+            <MenuItem
+              onClick={() => handleChangeAccountType("FRANCHISEE")}
+              disabled={
+                selectedCustomer.isDeleted || !canManage(selectedCustomer)
+              }
+            >
+              {selectedCustomer.role === "FRANCHISEE"
+                ? "Change to Regular Customer"
+                : "Change to Franchisee"}
+            </MenuItem>
+          )}
+        {can(currentUser, "customers.change_account_type") &&
+          selectedCustomer?.role === "CLIENT" && (
+            <MenuItem
+              onClick={() => handleChangeAccountType("SIMULATED")}
+              disabled={
+                selectedCustomer.isDeleted || !canManage(selectedCustomer)
+              }
+            >
+              Change to Simulated Account
+            </MenuItem>
+          )}
+        {selectedCustomer?.isDeleted
+          ? can(currentUser, "customers.restore") && (
+              <MenuItem
+                onClick={handleRestoreCustomer}
+                sx={{ color: `${d.success} !important` }}
+                disabled={!canManage(selectedCustomer)}
+              >
+                Restore Customer
+              </MenuItem>
+            )
+          : can(currentUser, "customers.delete") && (
+              <MenuItem
+                onClick={handleDeleteCustomer}
+                sx={{ color: `${d.danger} !important` }}
+                disabled={!selectedCustomer || !canManage(selectedCustomer)}
+              >
+                Delete Customer
+              </MenuItem>
+            )}
       </Menu>
 
       {/* Activity Chart Section */}

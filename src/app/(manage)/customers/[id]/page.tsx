@@ -45,6 +45,8 @@ import {
   useDaylightAdminSx,
 } from "@/components/daylight/AdminPage";
 import { useDaylight } from "@/lib/daylight";
+import { useUser } from "@/lib/hooks";
+import { can } from "@/lib/auth/can";
 
 // "All subaccounts" option value in the subaccount filter.
 const ALL_SUBACCOUNTS = "__all__";
@@ -135,6 +137,7 @@ interface EarningsSummary {
 
 export default function CustomerDetailPage() {
   const params = useParams();
+  const { user } = useUser();
   const router = useRouter();
   const customerId = params.id as string;
   const [activeView, setActiveView] = React.useState<
@@ -595,16 +598,18 @@ export default function CustomerDetailPage() {
               {BtcLivePriceComponent}
               {/* Opens the compose page in a new tab: email the customer a
                   PDF of their wallet page. */}
-              <Button
-                variant="outlined"
-                size="small"
-                startIcon={<EmailIcon />}
-                href={`/customers/${customerId}/wallet-email`}
-                target="_blank"
-                rel="noopener"
-              >
-                Email wallet snapshot
-              </Button>
+              {can(user, "customers.send_wallet_email") && (
+                <Button
+                  variant="outlined"
+                  size="small"
+                  startIcon={<EmailIcon />}
+                  href={`/customers/${customerId}/wallet-email`}
+                  target="_blank"
+                  rel="noopener"
+                >
+                  Email wallet snapshot
+                </Button>
+              )}
             </Box>
           </Box>
 

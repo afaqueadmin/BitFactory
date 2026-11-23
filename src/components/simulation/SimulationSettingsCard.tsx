@@ -15,6 +15,8 @@ import {
 } from "@mui/material";
 import { formatValue } from "@/lib/helpers/formatValue";
 import { useDaylight } from "@/lib/daylight";
+import { useUser } from "@/lib/hooks";
+import { can } from "@/lib/auth/can";
 import { useDaylightAdminSx } from "@/components/daylight/AdminPage";
 
 interface MinerOption {
@@ -50,6 +52,7 @@ export default function SimulationSettingsCard({
   onSaved?: () => void;
 }) {
   const { d, fonts } = useDaylight();
+  const { user } = useUser();
   const ds = useDaylightAdminSx();
   const [miners, setMiners] = useState<MinerOption[]>([]);
   const [minerId, setMinerId] = useState<string | null>(null);
@@ -261,14 +264,16 @@ export default function SimulationSettingsCard({
             />
           </Stack>
           <Box>
-            <Button
-              variant="contained"
-              onClick={handleSave}
-              sx={ds.primaryBtnSx}
-              disabled={saving || !minerId || bonus === "" || rate === ""}
-            >
-              {saving ? "Saving..." : "Save settings"}
-            </Button>
+            {can(user, "simulated_accounts.edit_settings") && (
+              <Button
+                variant="contained"
+                onClick={handleSave}
+                sx={ds.primaryBtnSx}
+                disabled={saving || !minerId || bonus === "" || rate === ""}
+              >
+                {saving ? "Saving..." : "Save settings"}
+              </Button>
+            )}
           </Box>
         </Stack>
       )}

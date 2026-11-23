@@ -41,6 +41,8 @@ import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 import SaveIcon from "@mui/icons-material/Save";
 import { useDaylight } from "@/lib/daylight";
+import { useUser } from "@/lib/hooks";
+import { can } from "@/lib/auth/can";
 import {
   CellNote,
   DaylightAdminPage,
@@ -80,6 +82,8 @@ export default function AdminRepairChargesPage() {
     includeInactive: true,
   });
   const { update, remove, reorder, busy } = useManageRepairCharges();
+  const { user } = useUser();
+  const canEdit = can(user, "repair_charges.edit");
 
   const [actionError, setActionError] = useState<string | null>(null);
   // null: closed; "new": add dialog; a charge: edit dialog.
@@ -131,14 +135,16 @@ export default function AdminRepairChargesPage() {
             >
               Client view
             </Button>
-            <Button
-              variant="contained"
-              startIcon={<AddIcon />}
-              onClick={() => setEditing("new")}
-              sx={ds.primaryBtnSx}
-            >
-              Add repair charge
-            </Button>
+            {canEdit && (
+              <Button
+                variant="contained"
+                startIcon={<AddIcon />}
+                onClick={() => setEditing("new")}
+                sx={ds.primaryBtnSx}
+              >
+                Add repair charge
+              </Button>
+            )}
           </>
         }
       />
@@ -211,7 +217,7 @@ export default function AdminRepairChargesPage() {
                           <IconButton
                             size="small"
                             aria-label="Move up"
-                            disabled={busy || i === 0}
+                            disabled={busy || !canEdit || i === 0}
                             onClick={() => handleMove(i, -1)}
                           >
                             <ArrowUpwardIcon fontSize="small" />
@@ -219,7 +225,9 @@ export default function AdminRepairChargesPage() {
                           <IconButton
                             size="small"
                             aria-label="Move down"
-                            disabled={busy || i === siteCharges.length - 1}
+                            disabled={
+                              busy || !canEdit || i === siteCharges.length - 1
+                            }
                             onClick={() => handleMove(i, 1)}
                           >
                             <ArrowDownwardIcon fontSize="small" />
@@ -239,7 +247,7 @@ export default function AdminRepairChargesPage() {
                           <Switch
                             size="small"
                             checked={c.isActive}
-                            disabled={busy}
+                            disabled={busy || !canEdit}
                             inputProps={{ "aria-label": "Active" }}
                             onChange={() =>
                               run(
@@ -254,25 +262,29 @@ export default function AdminRepairChargesPage() {
                           )}
                         </TableCell>
                         <TableCell align="right">
-                          <Tooltip title="Edit">
-                            <IconButton
-                              size="small"
-                              disabled={busy}
-                              onClick={() => setEditing(c)}
-                            >
-                              <EditOutlinedIcon fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
-                          <Tooltip title="Delete">
-                            <IconButton
-                              size="small"
-                              color="error"
-                              disabled={busy}
-                              onClick={() => handleDelete(c)}
-                            >
-                              <DeleteOutlineIcon fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
+                          {canEdit && (
+                            <>
+                              <Tooltip title="Edit">
+                                <IconButton
+                                  size="small"
+                                  disabled={busy}
+                                  onClick={() => setEditing(c)}
+                                >
+                                  <EditOutlinedIcon fontSize="small" />
+                                </IconButton>
+                              </Tooltip>
+                              <Tooltip title="Delete">
+                                <IconButton
+                                  size="small"
+                                  color="error"
+                                  disabled={busy}
+                                  onClick={() => handleDelete(c)}
+                                >
+                                  <DeleteOutlineIcon fontSize="small" />
+                                </IconButton>
+                              </Tooltip>
+                            </>
+                          )}
                         </TableCell>
                       </TableRow>
                     ))}
@@ -305,6 +317,7 @@ function SiteSettingsCard({
   const { d } = useDaylight();
   const ds = useDaylightAdminSx();
   const { saveSetting, savingSetting } = useManageRepairCharges();
+  const { user } = useUser();
   const [fee, setFee] = useState(
     setting ? String(setting.handsAndEyesFee) : "",
   );
@@ -390,17 +403,19 @@ function SiteSettingsCard({
           sx={{ flex: 1 }}
           slotProps={{ htmlInput: { maxLength: MAX_REPAIR_URL_LENGTH } }}
         />
-        <Button
-          variant="contained"
-          onClick={handleSave}
-          disabled={savingSetting || fee === ""}
-          startIcon={
-            savingSetting ? <CircularProgress size={16} /> : <SaveIcon />
-          }
-          sx={ds.primaryBtnSx}
-        >
-          Save
-        </Button>
+        {can(user, "repair_charges.edit") && (
+          <Button
+            variant="contained"
+            onClick={handleSave}
+            disabled={savingSetting || fee === ""}
+            startIcon={
+              savingSetting ? <CircularProgress size={16} /> : <SaveIcon />
+            }
+            sx={ds.primaryBtnSx}
+          >
+            Save
+          </Button>
+        )}
       </Box>
     </Paper>
   );

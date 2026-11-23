@@ -27,6 +27,8 @@ import {
   Edit as EditIcon,
   Delete as DeleteIcon,
 } from "@mui/icons-material";
+import { useUser } from "@/lib/hooks";
+import { can } from "@/lib/auth/can";
 
 interface PoolOption {
   id: string;
@@ -51,6 +53,8 @@ export default function PoolAuthSection({
   customerId,
   onChange,
 }: PoolAuthSectionProps) {
+  const { user } = useUser();
+  const canManage = can(user, "pools.manage_credentials");
   const [poolAuths, setPoolAuths] = useState<PoolAuthEntry[]>([]);
   const [pools, setPools] = useState<PoolOption[]>([]);
   const [loading, setLoading] = useState(true);
@@ -199,14 +203,16 @@ export default function PoolAuthSection({
         <Typography variant="h6" fontWeight="600">
           Pool Authentication
         </Typography>
-        <Button
-          size="small"
-          variant="outlined"
-          startIcon={<AddIcon />}
-          onClick={openAddForm}
-        >
-          Add Credential
-        </Button>
+        {canManage && (
+          <Button
+            size="small"
+            variant="outlined"
+            startIcon={<AddIcon />}
+            onClick={openAddForm}
+          >
+            Add Credential
+          </Button>
+        )}
       </Stack>
 
       {error && (
@@ -300,19 +306,23 @@ export default function PoolAuthSection({
                     {new Date(entry.updatedAt).toLocaleString()}
                   </TableCell>
                   <TableCell align="right">
-                    <IconButton
-                      size="small"
-                      onClick={() => openEditForm(entry)}
-                    >
-                      <EditIcon fontSize="small" />
-                    </IconButton>
-                    <IconButton
-                      size="small"
-                      color="error"
-                      onClick={() => setDeleteTarget(entry)}
-                    >
-                      <DeleteIcon fontSize="small" />
-                    </IconButton>
+                    {canManage && (
+                      <>
+                        <IconButton
+                          size="small"
+                          onClick={() => openEditForm(entry)}
+                        >
+                          <EditIcon fontSize="small" />
+                        </IconButton>
+                        <IconButton
+                          size="small"
+                          color="error"
+                          onClick={() => setDeleteTarget(entry)}
+                        >
+                          <DeleteIcon fontSize="small" />
+                        </IconButton>
+                      </>
+                    )}
                   </TableCell>
                 </TableRow>
               ))

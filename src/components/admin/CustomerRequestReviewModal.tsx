@@ -17,6 +17,8 @@ import {
 } from "@mui/material";
 import { Close as CloseIcon } from "@mui/icons-material";
 import LuxorSubaccountMultiSelect from "@/components/LuxorSubaccountMultiSelect";
+import { useUser } from "@/lib/hooks";
+import { can } from "@/lib/auth/can";
 
 export interface CustomerRequestRow {
   id: string;
@@ -46,6 +48,7 @@ export default function CustomerRequestReviewModal({
   onClose,
   onSuccess,
 }: CustomerRequestReviewModalProps) {
+  const { user } = useUser();
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -295,25 +298,33 @@ export default function CustomerRequestReviewModal({
         </Button>
         {isPending && (
           <>
-            <Button
-              onClick={handleReject}
-              variant="outlined"
-              color="error"
-              disabled={busy}
-            >
-              {rejecting ? (
-                <CircularProgress size={20} color="inherit" />
-              ) : (
-                "Reject Request"
-              )}
-            </Button>
-            <Button onClick={handleApprove} variant="contained" disabled={busy}>
-              {approving ? (
-                <CircularProgress size={20} color="inherit" />
-              ) : (
-                "Create User"
-              )}
-            </Button>
+            {can(user, "franchisees.reject_customer_requests") && (
+              <Button
+                onClick={handleReject}
+                variant="outlined"
+                color="error"
+                disabled={busy}
+              >
+                {rejecting ? (
+                  <CircularProgress size={20} color="inherit" />
+                ) : (
+                  "Reject Request"
+                )}
+              </Button>
+            )}
+            {can(user, "franchisees.approve_customer_requests") && (
+              <Button
+                onClick={handleApprove}
+                variant="contained"
+                disabled={busy}
+              >
+                {approving ? (
+                  <CircularProgress size={20} color="inherit" />
+                ) : (
+                  "Create User"
+                )}
+              </Button>
+            )}
           </>
         )}
       </DialogActions>

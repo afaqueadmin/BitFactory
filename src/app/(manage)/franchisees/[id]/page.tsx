@@ -9,6 +9,7 @@
  */
 
 import { isStaffRole } from "@/lib/auth/staffRoles";
+import { can } from "@/lib/auth/can";
 import React, { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -248,7 +249,7 @@ export default function FranchiseDetailsPage() {
           </Box>
           {franchise && (
             <Stack direction="row" spacing={1}>
-              {isAdmin && (
+              {isAdmin && can(user, "franchisees.edit") && (
                 <Button
                   variant="outlined"
                   startIcon={<EditIcon />}

@@ -41,6 +41,8 @@ import WalletOverview from "@/components/wallet/WalletOverview";
 import WalletSnapshotHeading from "@/components/wallet/WalletSnapshotHeading";
 import { ThemeContext } from "@/app/theme-provider";
 import { useDaylight } from "@/lib/daylight";
+import { useUser } from "@/lib/hooks";
+import { can } from "@/lib/auth/can";
 
 interface ComposeData {
   customer: {
@@ -158,6 +160,7 @@ const SnapshotCanvas = React.forwardRef<
 
 export default function WalletEmailPage() {
   const { id: customerId } = useParams<{ id: string }>();
+  const { user } = useUser();
 
   const [data, setData] = useState<ComposeData | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -407,20 +410,22 @@ export default function WalletEmailPage() {
           />
 
           <Box sx={{ display: "flex", justifyContent: "flex-end", mt: 2 }}>
-            <Button
-              variant="contained"
-              startIcon={
-                sending ? (
-                  <CircularProgress size={18} color="inherit" />
-                ) : (
-                  <SendIcon />
-                )
-              }
-              disabled={!canSend}
-              onClick={() => setConfirmOpen(true)}
-            >
-              {sending ? "Generating PDF and sending..." : "Send email"}
-            </Button>
+            {can(user, "customers.send_wallet_email") && (
+              <Button
+                variant="contained"
+                startIcon={
+                  sending ? (
+                    <CircularProgress size={18} color="inherit" />
+                  ) : (
+                    <SendIcon />
+                  )
+                }
+                disabled={!canSend}
+                onClick={() => setConfirmOpen(true)}
+              >
+                {sending ? "Generating PDF and sending..." : "Send email"}
+              </Button>
+            )}
           </Box>
         </Paper>
 

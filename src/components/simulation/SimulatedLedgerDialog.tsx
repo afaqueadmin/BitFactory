@@ -28,6 +28,8 @@ import {
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import { paymentTypeLabel } from "@/lib/accounting/paymentTypes";
 import { formatValue } from "@/lib/helpers/formatValue";
+import { useUser } from "@/lib/hooks";
+import { can } from "@/lib/auth/can";
 
 interface LedgerEntry {
   id: string;
@@ -62,6 +64,8 @@ export default function SimulatedLedgerDialog({
   onClose: () => void;
   onChanged?: () => void;
 }) {
+  const { user } = useUser();
+  const canManage = can(user, "simulated_accounts.manage_ledger");
   const [data, setData] = useState<LedgerResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -199,63 +203,67 @@ export default function SimulatedLedgerDialog({
               </Box>
             </Stack>
 
-            <Stack
-              direction={{ xs: "column", sm: "row" }}
-              spacing={1.5}
-              mb={2}
-              alignItems={{ sm: "flex-start" }}
-            >
-              <TextField
-                select
-                size="small"
-                label="Type"
-                value={type}
-                onChange={(e) =>
-                  setType(e.target.value as "PAYMENT" | "ADJUSTMENT")
-                }
-                sx={{ minWidth: 150 }}
+            {canManage && (
+              <Stack
+                direction={{ xs: "column", sm: "row" }}
+                spacing={1.5}
+                mb={2}
+                alignItems={{ sm: "flex-start" }}
               >
-                <MenuItem value="PAYMENT">Payment</MenuItem>
-                <MenuItem value="ADJUSTMENT">Adjustment</MenuItem>
-              </TextField>
-              <TextField
-                size="small"
-                label="Amount"
-                type="number"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                helperText={type === "ADJUSTMENT" ? "Negative to deduct" : " "}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">$</InputAdornment>
-                  ),
-                }}
-                sx={{ minWidth: 140 }}
-              />
-              <TextField
-                size="small"
-                label={
-                  type === "ADJUSTMENT" ? "Narration (required)" : "Narration"
-                }
-                value={narration}
-                onChange={(e) => setNarration(e.target.value)}
-                inputProps={{ maxLength: 500 }}
-                fullWidth
-              />
-              <Button
-                variant="contained"
-                onClick={handleAdd}
-                disabled={
-                  busy ||
-                  !amount ||
-                  Number(amount) === 0 ||
-                  (type === "ADJUSTMENT" && !narration.trim())
-                }
-                sx={{ whiteSpace: "nowrap", minWidth: 90 }}
-              >
-                Add
-              </Button>
-            </Stack>
+                <TextField
+                  select
+                  size="small"
+                  label="Type"
+                  value={type}
+                  onChange={(e) =>
+                    setType(e.target.value as "PAYMENT" | "ADJUSTMENT")
+                  }
+                  sx={{ minWidth: 150 }}
+                >
+                  <MenuItem value="PAYMENT">Payment</MenuItem>
+                  <MenuItem value="ADJUSTMENT">Adjustment</MenuItem>
+                </TextField>
+                <TextField
+                  size="small"
+                  label="Amount"
+                  type="number"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  helperText={
+                    type === "ADJUSTMENT" ? "Negative to deduct" : " "
+                  }
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">$</InputAdornment>
+                    ),
+                  }}
+                  sx={{ minWidth: 140 }}
+                />
+                <TextField
+                  size="small"
+                  label={
+                    type === "ADJUSTMENT" ? "Narration (required)" : "Narration"
+                  }
+                  value={narration}
+                  onChange={(e) => setNarration(e.target.value)}
+                  inputProps={{ maxLength: 500 }}
+                  fullWidth
+                />
+                <Button
+                  variant="contained"
+                  onClick={handleAdd}
+                  disabled={
+                    busy ||
+                    !amount ||
+                    Number(amount) === 0 ||
+                    (type === "ADJUSTMENT" && !narration.trim())
+                  }
+                  sx={{ whiteSpace: "nowrap", minWidth: 90 }}
+                >
+                  Add
+                </Button>
+              </Stack>
+            )}
 
             <TableContainer component={Paper} variant="outlined">
               <Table size="small">
@@ -303,17 +311,19 @@ export default function SimulatedLedgerDialog({
                         </TableCell>
                         <TableCell>{e.narration || "-"}</TableCell>
                         <TableCell align="right">
-                          <Tooltip title="Remove entry">
-                            <span>
-                              <IconButton
-                                size="small"
-                                onClick={() => handleRemove(e)}
-                                disabled={busy}
-                              >
-                                <DeleteOutlineIcon fontSize="small" />
-                              </IconButton>
-                            </span>
-                          </Tooltip>
+                          {canManage && (
+                            <Tooltip title="Remove entry">
+                              <span>
+                                <IconButton
+                                  size="small"
+                                  onClick={() => handleRemove(e)}
+                                  disabled={busy}
+                                >
+                                  <DeleteOutlineIcon fontSize="small" />
+                                </IconButton>
+                              </span>
+                            </Tooltip>
+                          )}
                         </TableCell>
                       </TableRow>
                     ))

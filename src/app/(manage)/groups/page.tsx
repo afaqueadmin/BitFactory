@@ -59,6 +59,8 @@ import AccountTreeIcon from "@mui/icons-material/AccountTree";
 import LinkOffIcon from "@mui/icons-material/LinkOff";
 import StatCard from "@/components/daylight/StatCard";
 import { RADIUS_CARD, useDaylight } from "@/lib/daylight";
+import { useUser } from "@/lib/hooks";
+import { can } from "@/lib/auth/can";
 import {
   CellNote,
   DaylightAdminPage,
@@ -182,6 +184,7 @@ const initialDialogState: DialogState = {
 
 export default function GroupsPage() {
   const router = useRouter();
+  const { user } = useUser();
   const { d, fonts } = useDaylight();
   const ds = useDaylightAdminSx();
   const [state, setState] = useState<GroupsState>({
@@ -862,14 +865,16 @@ export default function GroupsPage() {
             >
               {isRefreshing ? "Refreshing..." : "Refresh"}
             </Button>
-            <Button
-              variant="contained"
-              startIcon={<AddIcon />}
-              onClick={openCreateDialog}
-              sx={ds.primaryBtnSx}
-            >
-              Create Group
-            </Button>
+            {can(user, "customer_groups.create") && (
+              <Button
+                variant="contained"
+                startIcon={<AddIcon />}
+                onClick={openCreateDialog}
+                sx={ds.primaryBtnSx}
+              >
+                Create Group
+              </Button>
+            )}
           </>
         }
       />
@@ -1004,26 +1009,30 @@ export default function GroupsPage() {
                       spacing={0.5}
                       justifyContent="flex-end"
                     >
-                      <Tooltip title="Edit Group">
-                        <IconButton
-                          size="small"
-                          aria-label={`Edit ${group.name}`}
-                          onClick={() => openEditDialog(group)}
-                          sx={iconBtnSx("action")}
-                        >
-                          <EditIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="Delete Group">
-                        <IconButton
-                          size="small"
-                          aria-label={`Delete ${group.name}`}
-                          onClick={() => openDeleteDialog(group)}
-                          sx={iconBtnSx("danger")}
-                        >
-                          <DeleteIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
+                      {can(user, "customer_groups.edit") && (
+                        <Tooltip title="Edit Group">
+                          <IconButton
+                            size="small"
+                            aria-label={`Edit ${group.name}`}
+                            onClick={() => openEditDialog(group)}
+                            sx={iconBtnSx("action")}
+                          >
+                            <EditIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      )}
+                      {can(user, "customer_groups.delete") && (
+                        <Tooltip title="Delete Group">
+                          <IconButton
+                            size="small"
+                            aria-label={`Delete ${group.name}`}
+                            onClick={() => openDeleteDialog(group)}
+                            sx={iconBtnSx("danger")}
+                          >
+                            <DeleteIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      )}
                     </Stack>
                   </TableCell>
                 </TableRow>

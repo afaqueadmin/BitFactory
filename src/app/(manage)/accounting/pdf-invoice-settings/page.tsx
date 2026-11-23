@@ -14,6 +14,8 @@ import {
 import SaveIcon from "@mui/icons-material/Save";
 import ClearIcon from "@mui/icons-material/Clear";
 import { useDaylight } from "@/lib/daylight";
+import { useUser } from "@/lib/hooks";
+import { can } from "@/lib/auth/can";
 import {
   DaylightAdminPage,
   useDaylightAdminSx,
@@ -48,6 +50,7 @@ interface PaymentDetailsType {
 }
 
 export default function PDFInvoiceSettingsPage() {
+  const { user } = useUser();
   const { d } = useDaylight();
   const ds = useDaylightAdminSx();
   const router = useRouter();
@@ -488,15 +491,17 @@ export default function PDFInvoiceSettingsPage() {
           >
             Cancel
           </Button>
-          <Button
-            variant="contained"
-            startIcon={<SaveIcon />}
-            onClick={handleSave}
-            disabled={saving}
-            sx={ds.primaryBtnSx}
-          >
-            {saving ? "Saving..." : "Save Changes"}
-          </Button>
+          {can(user, "invoice_pdf_settings.edit") && (
+            <Button
+              variant="contained"
+              startIcon={<SaveIcon />}
+              onClick={handleSave}
+              disabled={saving}
+              sx={ds.primaryBtnSx}
+            >
+              {saving ? "Saving..." : "Save Changes"}
+            </Button>
+          )}
         </Box>
       </Stack>
     </DaylightAdminPage>

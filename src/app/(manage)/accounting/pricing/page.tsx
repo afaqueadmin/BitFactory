@@ -28,6 +28,8 @@ import {
 } from "@/lib/hooks/usePricingConfigs";
 import { CurrencyDisplay } from "@/components/accounting/common/CurrencyDisplay";
 import { useDaylight } from "@/lib/daylight";
+import { useUser } from "@/lib/hooks";
+import { can } from "@/lib/auth/can";
 import {
   DaylightAdminPage,
   DaylightLoading,
@@ -35,6 +37,7 @@ import {
 } from "@/components/daylight/AdminPage";
 
 export default function PricingPage() {
+  const { user } = useUser();
   const { d } = useDaylight();
   const ds = useDaylightAdminSx();
   const [page, setPage] = useState(1);
@@ -137,15 +140,17 @@ export default function PricingPage() {
                   {new Date(pricing.effectiveFrom).toLocaleDateString()}
                 </TableCell>
                 <TableCell>
-                  <Button
-                    size="small"
-                    variant="outlined"
-                    startIcon={<EditIcon />}
-                    onClick={() => handleEditClick(pricing)}
-                    sx={ds.outlineBtnSx}
-                  >
-                    Edit
-                  </Button>
+                  {can(user, "pricing.edit") && (
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      startIcon={<EditIcon />}
+                      onClick={() => handleEditClick(pricing)}
+                      sx={ds.outlineBtnSx}
+                    >
+                      Edit
+                    </Button>
+                  )}
                 </TableCell>
               </TableRow>
             ))}

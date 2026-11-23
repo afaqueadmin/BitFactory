@@ -41,6 +41,8 @@ import {
   useRecordMinerRestart,
   type HashrateAlertItem,
 } from "@/lib/hooks/useHashrateAlerts";
+import { useUser } from "@/lib/hooks";
+import { can } from "@/lib/auth/can";
 
 /** A Date as the local "YYYY-MM-DDTHH:mm" string a datetime-local input takes. */
 function toDateTimeLocalValue(date: Date): string {
@@ -73,6 +75,8 @@ type SortField =
 
 export default function HashrateAlertsPage() {
   const ds = useDaylightAdminSx();
+  const { user } = useUser();
+  const canAck = can(user, "hashrate_alerts.acknowledge");
   const [filter, setFilter] = useState("false");
   const { alerts, loading, error, refetch } = useHashrateAlerts(
     filter ? { acknowledged: filter === "true" } : undefined,
@@ -335,16 +339,18 @@ export default function HashrateAlertsPage() {
             sx={{ minWidth: 180, ...ds.inputSx }}
           />
         </Stack>
-        <Button
-          sx={ds.primaryBtnSx}
-          variant="contained"
-          disabled={loading || pendingFilteredAlerts.length === 0}
-          onClick={() => setBulkDialogOpen(true)}
-        >
-          Bulk Acknowledge{" "}
-          {pendingFilteredAlerts.length > 0 &&
-            `(${pendingFilteredAlerts.length})`}
-        </Button>
+        {canAck && (
+          <Button
+            sx={ds.primaryBtnSx}
+            variant="contained"
+            disabled={loading || pendingFilteredAlerts.length === 0}
+            onClick={() => setBulkDialogOpen(true)}
+          >
+            Bulk Acknowledge{" "}
+            {pendingFilteredAlerts.length > 0 &&
+              `(${pendingFilteredAlerts.length})`}
+          </Button>
+        )}
       </Stack>
 
       {actionError && (
@@ -488,15 +494,17 @@ export default function HashrateAlertsPage() {
                         spacing={1}
                         justifyContent="flex-end"
                       >
-                        <Button
-                          sx={ds.outlineBtnSx}
-                          size="small"
-                          variant="outlined"
-                          onClick={() => openRestartDialog(alert)}
-                        >
-                          Restart
-                        </Button>
-                        {!alert.acknowledgedAt && (
+                        {(canAck || can(user, "miners.log_restart")) && (
+                          <Button
+                            sx={ds.outlineBtnSx}
+                            size="small"
+                            variant="outlined"
+                            onClick={() => openRestartDialog(alert)}
+                          >
+                            Restart
+                          </Button>
+                        )}
+                        {canAck && !alert.acknowledgedAt && (
                           <Button
                             sx={ds.primaryBtnSx}
                             size="small"

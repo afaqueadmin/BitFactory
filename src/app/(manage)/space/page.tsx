@@ -43,6 +43,8 @@ import {
 } from "@mui/icons-material";
 import SpaceFormModal from "@/components/admin/SpaceFormModal";
 import { useDaylight } from "@/lib/daylight";
+import { useUser } from "@/lib/hooks";
+import { can } from "@/lib/auth/can";
 import {
   CellNote,
   DaylightAdminPage,
@@ -83,6 +85,7 @@ interface DeleteConfirmState {
 }
 
 export default function SpacesPage() {
+  const { user } = useUser();
   const { d, fonts } = useDaylight();
   const ds = useDaylightAdminSx();
 
@@ -293,15 +296,17 @@ export default function SpacesPage() {
             >
               {refreshing ? "Refreshing..." : "Refresh"}
             </Button>
-            <Button
-              variant="contained"
-              startIcon={<AddIcon />}
-              onClick={handleCreateClick}
-              disabled={loading || refreshing}
-              sx={ds.primaryBtnSx}
-            >
-              Add Space
-            </Button>
+            {can(user, "locations.create") && (
+              <Button
+                variant="contained"
+                startIcon={<AddIcon />}
+                onClick={handleCreateClick}
+                disabled={loading || refreshing}
+                sx={ds.primaryBtnSx}
+              >
+                Add Space
+              </Button>
+            )}
           </>
         }
       />
@@ -471,24 +476,28 @@ export default function SpacesPage() {
                         align="center"
                         sx={{ "&&&": { py: "8px", whiteSpace: "nowrap" } }}
                       >
-                        <IconButton
-                          size="small"
-                          onClick={() => handleEditClick(space)}
-                          title="Edit space"
-                          aria-label={`Edit ${space.name}`}
-                          sx={iconBtnSx()}
-                        >
-                          <EditIcon fontSize="small" />
-                        </IconButton>
-                        <IconButton
-                          size="small"
-                          onClick={() => handleDeleteClick(space)}
-                          title="Delete space"
-                          aria-label={`Delete ${space.name}`}
-                          sx={iconBtnSx("danger")}
-                        >
-                          <DeleteIcon fontSize="small" />
-                        </IconButton>
+                        {can(user, "locations.edit") && (
+                          <IconButton
+                            size="small"
+                            onClick={() => handleEditClick(space)}
+                            title="Edit space"
+                            aria-label={`Edit ${space.name}`}
+                            sx={iconBtnSx()}
+                          >
+                            <EditIcon fontSize="small" />
+                          </IconButton>
+                        )}
+                        {can(user, "locations.delete") && (
+                          <IconButton
+                            size="small"
+                            onClick={() => handleDeleteClick(space)}
+                            title="Delete space"
+                            aria-label={`Delete ${space.name}`}
+                            sx={iconBtnSx("danger")}
+                          >
+                            <DeleteIcon fontSize="small" />
+                          </IconButton>
+                        )}
                       </TableCell>
                     </TableRow>
                   );

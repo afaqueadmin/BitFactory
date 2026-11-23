@@ -33,6 +33,7 @@ import {
   MoreVert as MoreVertIcon,
 } from "@mui/icons-material";
 import { useUser } from "@/lib/hooks/useUser";
+import { can } from "@/lib/auth/can";
 import AdminValueCard from "@/components/admin/AdminValueCard";
 import { useDaylight } from "@/lib/daylight";
 import {
@@ -489,15 +490,17 @@ export default function HardwarePage() {
         title="Hardware Management"
         description="Manage mining hardware models and their specifications."
         actions={
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={handleCreateNew}
-            disabled={loading}
-            sx={ds.primaryBtnSx}
-          >
-            Add Hardware
-          </Button>
+          can(user, "hardware_models.create") && (
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={handleCreateNew}
+              disabled={loading}
+              sx={ds.primaryBtnSx}
+            >
+              Add Hardware
+            </Button>
+          )
         }
       />
 
@@ -634,31 +637,37 @@ export default function HardwarePage() {
                       onClose={handleMenuClose}
                       slotProps={{ paper: { sx: menuPaperSx } }}
                     >
-                      <MenuItem onClick={() => handleEdit(hw)}>
-                        <EditIcon fontSize="small" sx={{ mr: 1 }} />
-                        Edit
-                      </MenuItem>
-                      <MenuItem onClick={() => handleOpenProcurement(hw.id)}>
-                        <Typography fontSize="small">
-                          📦 Procure Hardware
-                        </Typography>
-                      </MenuItem>
+                      {can(user, "hardware_models.edit") && (
+                        <MenuItem onClick={() => handleEdit(hw)}>
+                          <EditIcon fontSize="small" sx={{ mr: 1 }} />
+                          Edit
+                        </MenuItem>
+                      )}
+                      {can(user, "hardware_models.procure") && (
+                        <MenuItem onClick={() => handleOpenProcurement(hw.id)}>
+                          <Typography fontSize="small">
+                            📦 Procure Hardware
+                          </Typography>
+                        </MenuItem>
+                      )}
                       <MenuItem onClick={() => handleOpenHistory(hw)}>
                         <Typography fontSize="small">
                           📋 Show Procurement History
                         </Typography>
                       </MenuItem>
-                      <MenuItem
-                        disabled={hw.isDeleted}
-                        onClick={() => {
-                          handleMenuClose();
-                          setDeleteConfirm(hw.id);
-                        }}
-                        sx={{ "&&": { color: d.danger } }}
-                      >
-                        <DeleteIcon fontSize="small" sx={{ mr: 1 }} />
-                        Delete
-                      </MenuItem>
+                      {can(user, "hardware_models.delete") && (
+                        <MenuItem
+                          disabled={hw.isDeleted}
+                          onClick={() => {
+                            handleMenuClose();
+                            setDeleteConfirm(hw.id);
+                          }}
+                          sx={{ "&&": { color: d.danger } }}
+                        >
+                          <DeleteIcon fontSize="small" sx={{ mr: 1 }} />
+                          Delete
+                        </MenuItem>
+                      )}
                     </Menu>
                   </TableCell>
                 </TableRow>

@@ -32,6 +32,8 @@ import {
 import { useParams } from "next/navigation";
 import { useState, useEffect, useMemo } from "react";
 import { useAccountStatement } from "@/lib/hooks/useStatements";
+import { useUser } from "@/lib/hooks";
+import { can } from "@/lib/auth/can";
 import { StatusBadge } from "@/components/accounting/common/StatusBadge";
 import { CurrencyDisplay } from "@/components/accounting/common/CurrencyDisplay";
 import { DateDisplay } from "@/components/accounting/common/DateDisplay";
@@ -69,6 +71,7 @@ Sincerely,`,
 };
 
 export default function CustomerStatementPage() {
+  const { user } = useUser();
   const { customerId } = useParams();
   const { statement, loading, error } = useAccountStatement(
     customerId as string,
@@ -369,14 +372,16 @@ export default function CustomerStatementPage() {
             >
               {printLoading ? "Loading..." : "Print"}
             </Button>
-            <Button
-              variant="outlined"
-              startIcon={<SendIcon />}
-              onClick={() => setEmailDialogOpen(true)}
-              disabled={emailLoading}
-            >
-              Send Email
-            </Button>
+            {can(user, "customer_statements.send_email") && (
+              <Button
+                variant="outlined"
+                startIcon={<SendIcon />}
+                onClick={() => setEmailDialogOpen(true)}
+                disabled={emailLoading}
+              >
+                Send Email
+              </Button>
+            )}
           </Stack>
         </Stack>
 
