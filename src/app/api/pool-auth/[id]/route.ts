@@ -17,6 +17,7 @@ import {
 } from "@/lib/auth/authorization";
 import { AuditAction } from "@prisma/client";
 import { logPoolCredentialChange } from "@/lib/audit/logPoolCredentialChange";
+import { maskAuthKey } from "@/lib/poolAuthMask";
 import {
   SUBACCOUNT_TX_OPTIONS,
   setLuxorSubaccounts,
@@ -109,11 +110,14 @@ export async function PUT(
           updatedAt: true,
         },
       });
-      // GroupSubaccount keeps a copy of the name - keep it in step.
-      await tx.groupSubaccount.updateMany({
-        where: { poolAuthId: id },
-        data: { subaccountName: updated.authKey },
-      });
+      // GroupSubaccount keeps a copy of a Luxor name - keep it in step.
+      // Tokens are never copied (O3).
+      if (existing.pool.name === "Luxor") {
+        await tx.groupSubaccount.updateMany({
+          where: { poolAuthId: id },
+          data: { subaccountName: updated.authKey },
+        });
+      }
       await logPoolCredentialChange(tx, {
         action: AuditAction.POOL_CREDENTIAL_UPDATED,
         userId: existing.userId,
@@ -129,7 +133,14 @@ export async function PUT(
     console.log(`[PoolAuth API] PUT: Updated PoolAuth (id: ${id})`);
 
     return NextResponse.json<ApiResponse>(
-      { success: true, data: poolAuth, timestamp: new Date().toISOString() },
+      {
+        success: true,
+        data: {
+          ...poolAuth,
+          ...maskAuthKey(existing.pool.name, poolAuth.authKey),
+        },
+        timestamp: new Date().toISOString(),
+      },
       { status: 200 },
     );
   } catch (error) {

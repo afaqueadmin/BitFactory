@@ -36,6 +36,8 @@ import CustomerRequestReviewModal, {
   type CustomerRequestRow,
 } from "./CustomerRequestReviewModal";
 import { useDaylight } from "@/lib/daylight";
+import { useUser } from "@/lib/hooks";
+import { can } from "@/lib/auth/can";
 import {
   CellNote,
   DaylightEmptyState,
@@ -48,6 +50,7 @@ import {
 
 export default function CustomerRequestsPanel() {
   const { d, fonts } = useDaylight();
+  const { user } = useUser();
   const ds = useDaylightAdminSx();
   const [requests, setRequests] = useState<CustomerRequestRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -251,22 +254,24 @@ export default function CustomerRequestsPanel() {
           },
         }}
       >
-        <MenuItem
-          onClick={() => {
-            setDeletingRequest(menuRequest);
-            handleMenuClose();
-          }}
-          sx={{
-            minHeight: 40,
-            fontFamily: fonts.body,
-            fontSize: 13,
-            color: d.danger,
-            "&:hover": { bgcolor: d.dangerSoft },
-          }}
-        >
-          <DeleteIcon fontSize="small" sx={{ mr: 1 }} />
-          Delete Request
-        </MenuItem>
+        {can(user, "franchisees.reject_customer_requests") && (
+          <MenuItem
+            onClick={() => {
+              setDeletingRequest(menuRequest);
+              handleMenuClose();
+            }}
+            sx={{
+              minHeight: 40,
+              fontFamily: fonts.body,
+              fontSize: 13,
+              color: d.danger,
+              "&:hover": { bgcolor: d.dangerSoft },
+            }}
+          >
+            <DeleteIcon fontSize="small" sx={{ mr: 1 }} />
+            Delete Request
+          </MenuItem>
+        )}
       </Menu>
 
       <Dialog

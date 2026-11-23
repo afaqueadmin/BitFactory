@@ -10,7 +10,9 @@ import { assertFranchiseeOwnsCustomer } from "@/lib/franchiseeScope";
 export async function getInvoiceForPayer(
   req: NextRequest,
   invoiceId: string | null | undefined,
-): Promise<{ invoice: Invoice; userId: string } | { error: NextResponse }> {
+): Promise<
+  { invoice: Invoice; userId: string; role: string } | { error: NextResponse }
+> {
   const token = req.cookies.get("token")?.value;
   if (!token) {
     return {
@@ -60,5 +62,5 @@ export async function getInvoiceForPayer(
     if (denied) return { error: denied };
   }
 
-  return { invoice, userId: currentUser.userId };
+  return { invoice, userId: currentUser.userId, role: currentUser.role };
 }

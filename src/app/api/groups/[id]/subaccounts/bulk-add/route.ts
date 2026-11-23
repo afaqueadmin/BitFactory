@@ -5,6 +5,7 @@ import {
   requirePermission,
 } from "@/lib/auth/authorization";
 import { AuditAction } from "@prisma/client";
+import { groupSubaccountName } from "@/lib/poolAuthMask";
 
 /**
  * POST /api/groups/[id]/subaccounts/bulk-add
@@ -57,7 +58,7 @@ export async function POST(
 
       const poolAuths = await prisma.poolAuth.findMany({
         where: { id: { in: poolAuthIds } },
-        select: { id: true, authKey: true },
+        select: { id: true, authKey: true, pool: { select: { name: true } } },
       });
 
       // Check which credentials are already in groups
@@ -82,7 +83,7 @@ export async function POST(
 
       const toAdd = poolAuths.map((pa) => ({
         groupId,
-        subaccountName: pa.authKey,
+        subaccountName: groupSubaccountName(pa.pool.name, pa.authKey),
         poolAuthId: pa.id,
         addedBy: userId,
         addedByUserId: userId,

@@ -316,9 +316,9 @@ const ROUTES: ParityRow[] = [
     today: "staff",
   },
 
-  // Customer Groups. GET groups/[id] and groups/available also serve
-  // franchisees (own customers only); GET groups feeds the group picker in
-  // the create / edit customer dialogs.
+  // Customer Groups. GET groups feeds the group picker in the create / edit
+  // customer dialogs. GET groups/[id] and groups/available are staff only
+  // since O6 (they used to let franchisees in without filtering members).
   {
     route: "groups",
     method: "GET",

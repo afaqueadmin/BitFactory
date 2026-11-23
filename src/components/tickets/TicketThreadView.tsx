@@ -1,6 +1,8 @@
 "use client";
 
 import { isStaffRole } from "@/lib/auth/staffRoles";
+import { can } from "@/lib/auth/can";
+import { useUser } from "@/lib/hooks/useUser";
 import React, { useState } from "react";
 import {
   Box,
@@ -74,6 +76,7 @@ export default function TicketThreadView({
   const [replyError, setReplyError] = useState<string | null>(null);
   const [statusError, setStatusError] = useState<string | null>(null);
   const { d, fonts } = useDaylight();
+  const { user } = useUser();
 
   // Priority + internal notes stay a "staff" concept (ADMIN/SUPER_ADMIN/
   // ACCOUNTING/FRANCHISEE). Status is narrower: FRANCHISEE can raise/reply
@@ -82,7 +85,11 @@ export default function TicketThreadView({
   // below).
   const isStaff =
     isStaffRole(currentUserRole) || currentUserRole === "FRANCHISEE";
-  const canManageStatus = isStaffRole(currentUserRole);
+  // Staff also need the permission; clients and franchisees keep their rules.
+  const staffSide = isStaffRole(currentUserRole);
+  const canEditTicket = !staffSide || can(user, "tickets.edit");
+  const canReply = !staffSide || can(user, "tickets.reply");
+  const canManageStatus = staffSide && canEditTicket;
 
   if (loading) {
     return (
@@ -207,7 +214,7 @@ export default function TicketThreadView({
                   ))}
                 </TextField>
               )}
-              {isStaff && (
+              {isStaff && canEditTicket && (
                 <TextField
                   select
                   size="small"
@@ -293,49 +300,53 @@ export default function TicketThreadView({
 
           <Divider sx={{ my: 3 }} />
 
-          {replyError && (
-            <Alert severity="error" sx={{ mb: 2 }}>
-              {replyError}
-            </Alert>
-          )}
-          <TextField
-            label="Write a reply"
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            fullWidth
-            multiline
-            minRows={3}
-            inputProps={{ maxLength: 5000 }}
-          />
-          <Box
-            sx={{
-              mt: 1,
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-            }}
-          >
-            {isStaff ? (
-              <FormControlLabel
-                control={
-                  <Checkbox
-                    checked={isInternal}
-                    onChange={(e) => setIsInternal(e.target.checked)}
-                  />
-                }
-                label="Internal note (hidden from customer)"
+          {canReply && (
+            <>
+              {replyError && (
+                <Alert severity="error" sx={{ mb: 2 }}>
+                  {replyError}
+                </Alert>
+              )}
+              <TextField
+                label="Write a reply"
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                fullWidth
+                multiline
+                minRows={3}
+                inputProps={{ maxLength: 5000 }}
               />
-            ) : (
-              <span />
-            )}
-            <Button
-              variant="contained"
-              onClick={handleReply}
-              disabled={replying}
-            >
-              {replying ? <CircularProgress size={20} /> : "Send Reply"}
-            </Button>
-          </Box>
+              <Box
+                sx={{
+                  mt: 1,
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                }}
+              >
+                {isStaff ? (
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        checked={isInternal}
+                        onChange={(e) => setIsInternal(e.target.checked)}
+                      />
+                    }
+                    label="Internal note (hidden from customer)"
+                  />
+                ) : (
+                  <span />
+                )}
+                <Button
+                  variant="contained"
+                  onClick={handleReply}
+                  disabled={replying}
+                >
+                  {replying ? <CircularProgress size={20} /> : "Send Reply"}
+                </Button>
+              </Box>
+            </>
+          )}
         </Paper>
       </Box>
     );
@@ -481,7 +492,7 @@ export default function TicketThreadView({
                 ))}
               </TextField>
             )}
-            {isStaff && (
+            {isStaff && canEditTicket && (
               <TextField
                 select
                 size="small"
@@ -599,65 +610,72 @@ export default function TicketThreadView({
 
         <Divider sx={{ my: 3, borderColor: d.border }} />
 
-        {replyError && (
-          <Alert severity="error" sx={{ mb: 2, ...alertSx("error") }}>
-            {replyError}
-          </Alert>
-        )}
-        <TextField
-          label="Write a reply"
-          value={message}
-          onChange={(e) => setMessage(e.target.value)}
-          fullWidth
-          multiline
-          minRows={3}
-          inputProps={{ maxLength: 5000 }}
-          sx={inputSx}
-        />
-        <Box
-          sx={{
-            mt: 1,
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            flexWrap: "wrap",
-            gap: 1,
-          }}
-        >
-          {isStaff ? (
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={isInternal}
-                  onChange={(e) => setIsInternal(e.target.checked)}
-                  sx={{ color: d.muted, "&.Mui-checked": { color: d.action } }}
-                />
-              }
-              label="Internal note (hidden from customer)"
-              sx={{
-                "& .MuiFormControlLabel-label": {
-                  fontFamily: fonts.body,
-                  fontSize: 13,
-                  color: d.text,
-                },
-              }}
-            />
-          ) : (
-            <span />
-          )}
-          <Button
-            variant="contained"
-            onClick={handleReply}
-            disabled={replying}
-            sx={primaryBtnSx}
-          >
-            {replying ? (
-              <CircularProgress size={20} sx={{ color: "#fff" }} />
-            ) : (
-              "Send Reply"
+        {canReply && (
+          <>
+            {replyError && (
+              <Alert severity="error" sx={{ mb: 2, ...alertSx("error") }}>
+                {replyError}
+              </Alert>
             )}
-          </Button>
-        </Box>
+            <TextField
+              label="Write a reply"
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              fullWidth
+              multiline
+              minRows={3}
+              inputProps={{ maxLength: 5000 }}
+              sx={inputSx}
+            />
+            <Box
+              sx={{
+                mt: 1,
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                flexWrap: "wrap",
+                gap: 1,
+              }}
+            >
+              {isStaff ? (
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={isInternal}
+                      onChange={(e) => setIsInternal(e.target.checked)}
+                      sx={{
+                        color: d.muted,
+                        "&.Mui-checked": { color: d.action },
+                      }}
+                    />
+                  }
+                  label="Internal note (hidden from customer)"
+                  sx={{
+                    "& .MuiFormControlLabel-label": {
+                      fontFamily: fonts.body,
+                      fontSize: 13,
+                      color: d.text,
+                    },
+                  }}
+                />
+              ) : (
+                <span />
+              )}
+              <Button
+                variant="contained"
+                onClick={handleReply}
+                disabled={replying}
+                sx={primaryBtnSx}
+              >
+                {replying ? (
+                  <CircularProgress size={20} sx={{ color: "#fff" }} />
+                ) : (
+                  "Send Reply"
+                )}
+              </Button>
+            </Box>
+          </>
+        )}
       </Box>
     </Box>
   );

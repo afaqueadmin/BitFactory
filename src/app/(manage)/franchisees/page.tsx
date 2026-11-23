@@ -262,14 +262,16 @@ export default function FranchiseesPage() {
             >
               {isRefreshing ? "Refreshing..." : "Refresh"}
             </Button>
-            <Button
-              variant="contained"
-              startIcon={<AddIcon />}
-              onClick={() => setCreateModalOpen(true)}
-              sx={ds.primaryBtnSx}
-            >
-              Create New Franchisee
-            </Button>
+            {can(user, "franchisees.create") && (
+              <Button
+                variant="contained"
+                startIcon={<AddIcon />}
+                onClick={() => setCreateModalOpen(true)}
+                sx={ds.primaryBtnSx}
+              >
+                Create New Franchisee
+              </Button>
+            )}
           </>
         }
       />
@@ -466,17 +468,19 @@ export default function FranchiseesPage() {
             transformOrigin={{ vertical: "top", horizontal: "right" }}
             slotProps={{ paper: { sx: menuPaperSx } }}
           >
-            <MenuItem
-              onClick={() => {
-                setEditingFranchise(menuFranchise);
-                handleMenuClose();
-              }}
-            >
-              <ListItemIcon>
-                <EditIcon fontSize="small" />
-              </ListItemIcon>
-              <ListItemText>Edit</ListItemText>
-            </MenuItem>
+            {can(user, "franchisees.edit") && (
+              <MenuItem
+                onClick={() => {
+                  setEditingFranchise(menuFranchise);
+                  handleMenuClose();
+                }}
+              >
+                <ListItemIcon>
+                  <EditIcon fontSize="small" />
+                </ListItemIcon>
+                <ListItemText>Edit</ListItemText>
+              </MenuItem>
+            )}
             <MenuItem
               onClick={() => {
                 if (menuFranchise) {

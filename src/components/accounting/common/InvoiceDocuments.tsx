@@ -25,6 +25,8 @@ import {
 import PictureAsPdfIcon from "@mui/icons-material/PictureAsPdf";
 import TableChartIcon from "@mui/icons-material/TableChart";
 import { useState } from "react";
+import { useUser } from "@/lib/hooks";
+import { can } from "@/lib/auth/can";
 import { PdfUploadField, UploadedPdf } from "./PdfUploadField";
 
 export interface InvoiceDocumentFields {
@@ -78,7 +80,13 @@ export function InvoiceDocuments({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const editable = invoice.paymentStatus === "Pending";
+  const { user } = useUser();
+  const editable =
+    invoice.paymentStatus === "Pending" &&
+    can(
+      user,
+      type === "hardware" ? "hardware_purchases.edit" : "farm_tariffs.edit",
+    );
   const base = `${API_BASE[type]}/${invoice.id}/documents`;
 
   const pdfName =

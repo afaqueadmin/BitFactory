@@ -53,6 +53,8 @@ import {
   VendorDepositDetail,
 } from "@/lib/hooks/useSecurityDeposits";
 import { useDaylight } from "@/lib/daylight";
+import { useUser } from "@/lib/hooks";
+import { can } from "@/lib/auth/can";
 import {
   DaylightAdminPage,
   DaylightLoading,
@@ -450,6 +452,7 @@ function VendorDetail({ vendorId }: { vendorId: string }) {
   const ds = useDaylightAdminSx();
   const { data: detail, isLoading, error } = useVendorDeposit(vendorId);
   const remove = useSaveDepositMovement();
+  const { user } = useUser();
   const [dialog, setDialog] = useState<"return" | "adjustment" | null>(null);
   const [deleting, setDeleting] = useState<DepositMovement | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -494,32 +497,34 @@ function VendorDetail({ vendorId }: { vendorId: string }) {
             </Box>
           )}
         </Typography>
-        <Stack direction="row" spacing={1}>
-          <Tooltip title={noHeld ? "The vendor holds no deposit" : ""}>
-            <span>
-              <Button
-                variant="outlined"
-                onClick={() => setDialog("return")}
-                disabled={noHeld}
-                sx={ds.outlineBtnSx}
-              >
-                Record return
-              </Button>
-            </span>
-          </Tooltip>
-          <Tooltip title={noHeld ? "The vendor holds no deposit" : ""}>
-            <span>
-              <Button
-                variant="contained"
-                onClick={() => setDialog("adjustment")}
-                disabled={noHeld}
-                sx={ds.primaryBtnSx}
-              >
-                Record adjustment
-              </Button>
-            </span>
-          </Tooltip>
-        </Stack>
+        {can(user, "security_deposits.record") && (
+          <Stack direction="row" spacing={1}>
+            <Tooltip title={noHeld ? "The vendor holds no deposit" : ""}>
+              <span>
+                <Button
+                  variant="outlined"
+                  onClick={() => setDialog("return")}
+                  disabled={noHeld}
+                  sx={ds.outlineBtnSx}
+                >
+                  Record return
+                </Button>
+              </span>
+            </Tooltip>
+            <Tooltip title={noHeld ? "The vendor holds no deposit" : ""}>
+              <span>
+                <Button
+                  variant="contained"
+                  onClick={() => setDialog("adjustment")}
+                  disabled={noHeld}
+                  sx={ds.primaryBtnSx}
+                >
+                  Record adjustment
+                </Button>
+              </span>
+            </Tooltip>
+          </Stack>
+        )}
       </Stack>
 
       <TotalsRow totals={detail.balance} />
@@ -679,26 +684,28 @@ function VendorDetail({ vendorId }: { vendorId: string }) {
                       <CurrencyDisplay value={m.amountUsd} />
                     </TableCell>
                     <TableCell align="right">
-                      <Tooltip
-                        title={
-                          locked
-                            ? "Its invoice is paid, so this can't be deleted"
-                            : "Delete"
-                        }
-                      >
-                        <span>
-                          <IconButton
-                            size="small"
-                            onClick={() => {
-                              setDeleteError(null);
-                              setDeleting(m);
-                            }}
-                            disabled={locked || remove.isPending}
-                          >
-                            <DeleteIcon fontSize="small" color="error" />
-                          </IconButton>
-                        </span>
-                      </Tooltip>
+                      {can(user, "security_deposits.delete") && (
+                        <Tooltip
+                          title={
+                            locked
+                              ? "Its invoice is paid, so this can't be deleted"
+                              : "Delete"
+                          }
+                        >
+                          <span>
+                            <IconButton
+                              size="small"
+                              onClick={() => {
+                                setDeleteError(null);
+                                setDeleting(m);
+                              }}
+                              disabled={locked || remove.isPending}
+                            >
+                              <DeleteIcon fontSize="small" color="error" />
+                            </IconButton>
+                          </span>
+                        </Tooltip>
+                      )}
                     </TableCell>
                   </TableRow>
                 );

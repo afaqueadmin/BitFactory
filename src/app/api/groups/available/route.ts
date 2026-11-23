@@ -4,7 +4,7 @@ import {
   getAuthorizationContext,
   requirePermission,
 } from "@/lib/auth/authorization";
-import { franchiseeUserFilter } from "@/lib/franchiseeScope";
+import { credentialLabel } from "@/lib/poolAuthMask";
 
 interface ApiResponse<T = unknown> {
   success: boolean;
@@ -17,24 +17,22 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   try {
     const ctx = await getAuthorizationContext(request);
     if ("response" in ctx) return ctx.response;
-    // Shared: a franchisee sees only their own customers (franchiseeUserFilter).
-    if (ctx.role !== "FRANCHISEE") {
-      const denied = requirePermission(ctx, "customer_groups.view");
-      if (denied) return denied;
-    }
-    const user = { userId: ctx.userId, role: ctx.role };
+    // Staff only (O6): no franchise screen uses this route, and the member
+    // list was never filtered for franchisees.
+    const denied = requirePermission(ctx, "customer_groups.view");
+    if (denied) return denied;
 
     // Get all PoolAuth rows for in-scope users (any pool)
     const allPoolAuths = await prisma.poolAuth.findMany({
       where: {
         user: {
           isDeleted: false,
-          ...franchiseeUserFilter({ id: user.userId, role: user.role }),
         },
       },
       select: {
         id: true,
         authKey: true,
+        pool: { select: { name: true } },
         user: {
           select: {
             id: true,
@@ -68,7 +66,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       .map((pa) => ({
         id: pa.id,
         poolAuthId: pa.id,
-        subaccountName: pa.authKey,
+        subaccountName: credentialLabel(pa.pool.name, pa.authKey),
         user: {
           id: pa.user.id,
           name: pa.user.name || "Unknown",
@@ -87,7 +85,6 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         isDeleted: false,
         poolAuths: { none: {} },
         id: { notIn: Array.from(groupedUserIds) },
-        ...franchiseeUserFilter({ id: user.userId, role: user.role }),
       },
       select: {
         id: true,

@@ -27,6 +27,8 @@ import ReceiptLongIcon from "@mui/icons-material/ReceiptLong";
 import SwapHorizIcon from "@mui/icons-material/SwapHoriz";
 import { TransferDialog } from "@/components/accounting/bankTransfer/TransferDialog";
 import { useDaylight } from "@/lib/daylight";
+import { useUser } from "@/lib/hooks";
+import { can } from "@/lib/auth/can";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
@@ -62,6 +64,7 @@ function EntitiesTab() {
   const ds = useDaylightAdminSx();
   const { data = [], isLoading, error } = useAccountingEntities();
   const editor = useRecordEditor<AccountingEntity>("entities");
+  const { user } = useUser();
   const [name, setName] = useState("");
 
   const openForm = (entity: AccountingEntity | "new") => {
@@ -72,14 +75,16 @@ function EntitiesTab() {
   return (
     <>
       <Stack direction="row" justifyContent="flex-end" sx={{ mb: 2 }}>
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={() => openForm("new")}
-          sx={ds.primaryBtnSx}
-        >
-          Add entity
-        </Button>
+        {can(user, "banks.manage_entities") && (
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={() => openForm("new")}
+            sx={ds.primaryBtnSx}
+          >
+            Add entity
+          </Button>
+        )}
       </Stack>
       {editor.pageError && (
         <Alert severity="error" sx={{ mb: 2, ...ds.alertSx("error") }}>
@@ -123,6 +128,8 @@ function EntitiesTab() {
                     onEdit={() => openForm(entity)}
                     onToggle={() => editor.toggle(entity)}
                     onDelete={() => editor.setDeleting(entity)}
+                    canEdit={can(user, "banks.manage_entities")}
+                    canDelete={can(user, "banks.manage_entities")}
                   />
                 </TableCell>
               </TableRow>
@@ -172,6 +179,7 @@ function BanksTab() {
   const { data: entities = [] } = useAccountingEntities();
   const { data: currencies = [] } = useAccountingCurrencies();
   const editor = useRecordEditor<AccountingBank>("banks");
+  const { user } = useUser();
   const [entityFilter, setEntityFilter] = useState("");
   const [recordingTransfer, setRecordingTransfer] = useState(false);
   const [form, setForm] = useState({
@@ -250,22 +258,26 @@ function BanksTab() {
           >
             Consolidated statement
           </Button>
-          <Button
-            variant="outlined"
-            startIcon={<SwapHorizIcon />}
-            onClick={() => setRecordingTransfer(true)}
-            sx={ds.outlineBtnSx}
-          >
-            Record transfer
-          </Button>
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={() => openForm("new")}
-            sx={ds.primaryBtnSx}
-          >
-            Add bank
-          </Button>
+          {can(user, "transfers.create") && (
+            <Button
+              variant="outlined"
+              startIcon={<SwapHorizIcon />}
+              onClick={() => setRecordingTransfer(true)}
+              sx={ds.outlineBtnSx}
+            >
+              Record transfer
+            </Button>
+          )}
+          {can(user, "banks.create") && (
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={() => openForm("new")}
+              sx={ds.primaryBtnSx}
+            >
+              Add bank
+            </Button>
+          )}
         </Stack>
       </Stack>
       {editor.pageError && (
@@ -356,6 +368,8 @@ function BanksTab() {
                     onEdit={() => openForm(bank)}
                     onToggle={() => editor.toggle(bank)}
                     onDelete={() => editor.setDeleting(bank)}
+                    canEdit={can(user, "banks.edit")}
+                    canDelete={can(user, "banks.delete")}
                   />
                 </TableCell>
               </TableRow>
@@ -477,6 +491,7 @@ function CurrenciesTab() {
   const ds = useDaylightAdminSx();
   const { data = [], isLoading, error } = useAccountingCurrencies();
   const editor = useRecordEditor<AccountingCurrency>("currencies");
+  const { user } = useUser();
   const [form, setForm] = useState({ code: "", name: "" });
 
   const openForm = (currency: AccountingCurrency | "new") => {
@@ -491,14 +506,16 @@ function CurrenciesTab() {
   return (
     <>
       <Stack direction="row" justifyContent="flex-end" sx={{ mb: 2 }}>
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={() => openForm("new")}
-          sx={ds.primaryBtnSx}
-        >
-          Add currency
-        </Button>
+        {can(user, "banks.manage_currencies") && (
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={() => openForm("new")}
+            sx={ds.primaryBtnSx}
+          >
+            Add currency
+          </Button>
+        )}
       </Stack>
       {editor.pageError && (
         <Alert severity="error" sx={{ mb: 2, ...ds.alertSx("error") }}>
@@ -542,6 +559,8 @@ function CurrenciesTab() {
                     onEdit={() => openForm(currency)}
                     onToggle={() => editor.toggle(currency)}
                     onDelete={() => editor.setDeleting(currency)}
+                    canEdit={can(user, "banks.manage_currencies")}
+                    canDelete={can(user, "banks.manage_currencies")}
                   />
                 </TableCell>
               </TableRow>

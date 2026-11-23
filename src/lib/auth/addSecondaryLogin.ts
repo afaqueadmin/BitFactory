@@ -1,4 +1,4 @@
-import { staffActorLabel } from "@/lib/auth/staffRoles";
+import { staffActorName } from "@/lib/auth/staffActorName";
 import { randomBytes } from "node:crypto";
 import { AuditAction } from "@prisma/client";
 import { hash } from "bcrypt";
@@ -184,9 +184,7 @@ export async function addSecondaryLogin({
       entityId: accountId,
       userId: actor.id,
       changes: { loginId: login.id, email },
-      description: `Sign-in email ${email} added to ${account.email} by ${staffActorLabel(
-        actor.role,
-      )} ${actor.email}${auditNote ? ` ${auditNote}` : ""}`,
+      description: `Sign-in email ${email} added to ${account.email} by ${await staffActorName(actor)} ${actor.email}${auditNote ? ` ${auditNote}` : ""}`,
       ...meta,
     },
   });

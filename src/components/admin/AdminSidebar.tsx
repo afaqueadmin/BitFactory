@@ -70,6 +70,7 @@ import {
   FactCheck as AuditLogIcon,
   ManageAccounts as AccessRulesIcon,
   AdminPanelSettings as RolesIcon,
+  Security as StaffAccessIcon,
   Dataset as DbDataIcon,
   ListAlt as SubaccountRecordsIcon,
   ShowChart as DailySnapshotsIcon,
@@ -420,13 +421,21 @@ const sidebarSections: SidebarSection[] = [
       },
       { title: "Audit Log", icon: <AuditLogIcon />, path: "/audit-log" },
       {
-        // Office hours + office-passkey rules for admin/accounting accounts.
-        title: "Access Rules (Incomplete - In Progress)",
-        icon: <AccessRulesIcon />,
-        path: "/access-rules",
-        badgeKey: "access",
+        // What staff may do (Roles) and when/where they may sign in (Access
+        // Rules). Shows only when one of the two pages opens for the user.
+        title: "Staff Access",
+        icon: <StaffAccessIcon />,
+        items: [
+          { title: "Roles", icon: <RolesIcon />, path: "/roles" },
+          {
+            // Office hours + office-passkey rules for staff accounts.
+            title: "Access Rules (Incomplete - In Progress)",
+            icon: <AccessRulesIcon />,
+            path: "/access-rules",
+            badgeKey: "access",
+          },
+        ],
       },
-      { title: "Roles", icon: <RolesIcon />, path: "/roles" },
       {
         title: "DB Data Management",
         icon: <DbDataIcon />,

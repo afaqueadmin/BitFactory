@@ -57,6 +57,8 @@ import {
 import GradientStatCard from "@/components/GradientStatCard";
 import { DaylightThemedPage } from "@/components/daylight/DaylightMuiScope";
 import { DaylightLoading } from "@/components/daylight/AdminPage";
+import { useUser } from "@/lib/hooks";
+import { can } from "@/lib/auth/can";
 
 /**
  * Group type
@@ -132,6 +134,8 @@ const initialDialogState: DialogState = {
 
 export default function GroupDetailPage() {
   const router = useRouter();
+  const { user } = useUser();
+  const canEdit = can(user, "customer_groups.edit");
   const params = useParams();
   const groupId = params.id as string;
 
@@ -611,15 +615,17 @@ export default function GroupDetailPage() {
               >
                 {isRefreshing ? "Refreshing..." : "Refresh"}
               </Button>
-              <Button
-                variant="contained"
-                startIcon={<AddIcon />}
-                onClick={openAddDialog}
-                disabled={state.availableSubaccounts.length === 0}
-                size="small"
-              >
-                Add Subaccount
-              </Button>
+              {canEdit && (
+                <Button
+                  variant="contained"
+                  startIcon={<AddIcon />}
+                  onClick={openAddDialog}
+                  disabled={state.availableSubaccounts.length === 0}
+                  size="small"
+                >
+                  Add Subaccount
+                </Button>
+              )}
             </Stack>
           </Box>
 
@@ -705,15 +711,17 @@ export default function GroupDetailPage() {
                             </Typography>
                           </TableCell>
                           <TableCell align="right">
-                            <Tooltip title="Remove Subaccount">
-                              <IconButton
-                                size="small"
-                                onClick={() => openRemoveDialog(subaccount)}
-                                color="error"
-                              >
-                                <DeleteIcon fontSize="small" />
-                              </IconButton>
-                            </Tooltip>
+                            {canEdit && (
+                              <Tooltip title="Remove Subaccount">
+                                <IconButton
+                                  size="small"
+                                  onClick={() => openRemoveDialog(subaccount)}
+                                  color="error"
+                                >
+                                  <DeleteIcon fontSize="small" />
+                                </IconButton>
+                              </Tooltip>
+                            )}
                           </TableCell>
                         </TableRow>
                       ))}

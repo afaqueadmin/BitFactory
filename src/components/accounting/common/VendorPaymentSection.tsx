@@ -61,6 +61,8 @@ import {
   useSaveDepositMovement,
   useVendorDeposit,
 } from "@/lib/hooks/useSecurityDeposits";
+import { useUser } from "@/lib/hooks";
+import { can } from "@/lib/auth/can";
 import {
   PdfUploadField,
   PdfUploadPurpose,
@@ -463,6 +465,17 @@ export function VendorPaymentSection({
   onUpdated,
   onCancelClick,
 }: VendorPaymentSectionProps) {
+  const { user } = useUser();
+  const hw = apiBase.includes("hardware-purchases");
+  const canPay = can(
+    user,
+    hw ? "hardware_purchases.record_payment" : "farm_tariffs.record_payment",
+  );
+  // Cancel saves the invoice (PUT), so it needs edit.
+  const canCancel = can(
+    user,
+    hw ? "hardware_purchases.edit" : "farm_tariffs.edit",
+  );
   const [paidDate, setPaidDate] = useState("");
   const [parts, setParts] = useState<PaymentPartValue[]>(() => [
     newPaymentPart(),
@@ -499,15 +512,17 @@ export function VendorPaymentSection({
           together with this vendor&apos;s invoices it was deducted from in the
           bank transfer.
         </Alert>
-        <Button
-          fullWidth
-          variant="outlined"
-          color="error"
-          startIcon={<CancelIcon />}
-          onClick={onCancelClick}
-        >
-          Cancel Invoice
-        </Button>
+        {canCancel && (
+          <Button
+            fullWidth
+            variant="outlined"
+            color="error"
+            startIcon={<CancelIcon />}
+            onClick={onCancelClick}
+          >
+            Cancel Invoice
+          </Button>
+        )}
       </Stack>
     );
   }
@@ -595,6 +610,20 @@ export function VendorPaymentSection({
       setSaving(false);
     }
   };
+
+  if (!canPay) {
+    return canCancel ? (
+      <Button
+        fullWidth
+        variant="outlined"
+        color="error"
+        startIcon={<CancelIcon />}
+        onClick={onCancelClick}
+      >
+        Cancel Invoice
+      </Button>
+    ) : null;
+  }
 
   return (
     <Stack spacing={2}>

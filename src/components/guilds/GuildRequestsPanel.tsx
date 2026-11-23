@@ -39,6 +39,8 @@ import {
 } from "@/components/daylight/AdminPage";
 import { useStepUp } from "@/components/StepUpDialog";
 import { asDate, useSortableRows } from "@/components/wallets/useSortableRows";
+import { useUser } from "@/lib/hooks";
+import { can } from "@/lib/auth/can";
 
 const STATUS_ORDER: Record<string, number> = {
   PENDING: 0,
@@ -123,6 +125,7 @@ export default function GuildRequestsPanel({
   const kindKey = kinds.join(",");
   const ds = useDaylightAdminSx();
   const { withStepUp, stepUpDialog } = useStepUp();
+  const { user } = useUser();
   // All statuses by default, so a request never drops out of view after an
   // action (a confirmed one still needs Approve).
   const [status, setStatus] = useState("");
@@ -378,40 +381,43 @@ export default function GuildRequestsPanel({
                   </TableCell>
                   <TableCell align="right">
                     <Stack direction="column" alignItems="flex-end" spacing={1}>
-                      {req.status === "PENDING" && (
-                        <Button
-                          size="small"
-                          variant="contained"
-                          sx={ds.primaryBtnSx}
-                          disabled={busy}
-                          onClick={() => setConfirmTarget(req)}
-                        >
-                          Confirm
-                        </Button>
-                      )}
-                      {req.status === "CONFIRMED" && (
-                        <Button
-                          size="small"
-                          variant="contained"
-                          sx={ds.successBtnSx}
-                          disabled={busy}
-                          onClick={() => act(req, "approve")}
-                        >
-                          Approve
-                        </Button>
-                      )}
-                      {(req.status === "PENDING" ||
-                        req.status === "CONFIRMED") && (
-                        <Button
-                          size="small"
-                          variant="outlined"
-                          sx={ds.dangerOutlineBtnSx}
-                          disabled={busy}
-                          onClick={() => setRejectTarget(req)}
-                        >
-                          Reject
-                        </Button>
-                      )}
+                      {can(user, "guild_requests.approve") &&
+                        req.status === "PENDING" && (
+                          <Button
+                            size="small"
+                            variant="contained"
+                            sx={ds.primaryBtnSx}
+                            disabled={busy}
+                            onClick={() => setConfirmTarget(req)}
+                          >
+                            Confirm
+                          </Button>
+                        )}
+                      {can(user, "guild_requests.approve") &&
+                        req.status === "CONFIRMED" && (
+                          <Button
+                            size="small"
+                            variant="contained"
+                            sx={ds.successBtnSx}
+                            disabled={busy}
+                            onClick={() => act(req, "approve")}
+                          >
+                            Approve
+                          </Button>
+                        )}
+                      {can(user, "guild_requests.reject") &&
+                        (req.status === "PENDING" ||
+                          req.status === "CONFIRMED") && (
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            sx={ds.dangerOutlineBtnSx}
+                            disabled={busy}
+                            onClick={() => setRejectTarget(req)}
+                          >
+                            Reject
+                          </Button>
+                        )}
                     </Stack>
                   </TableCell>
                 </TableRow>

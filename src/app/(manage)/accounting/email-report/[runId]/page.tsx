@@ -50,6 +50,8 @@ import {
   memoHref,
 } from "@/lib/accounting/emailReport";
 import { DaylightThemedPage } from "@/components/daylight/DaylightMuiScope";
+import { useUser } from "@/lib/hooks";
+import { can } from "@/lib/auth/can";
 
 interface EmailSendResult {
   id: string;
@@ -191,6 +193,7 @@ function DocumentCell({
 
 export default function EmailReportDetailPage() {
   const params = useParams();
+  const { user } = useUser();
   const runId = params.runId as string;
 
   const [data, setData] = useState<RunData | null>(null);
@@ -345,7 +348,8 @@ export default function EmailReportDetailPage() {
   }
 
   const { run, results } = data;
-  const canResend = canResendKind(run.kind);
+  const canResend =
+    canResendKind(run.kind) && can(user, "email_reports.resend");
   const isMemoRun = run.type === "MEMO";
   const resendableCount = results.filter((r) => r.invoice).length;
   const rate =

@@ -106,6 +106,9 @@ export default function EditCustomerModal({
   });
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [savedBraiins, setSavedBraiins] = useState<{
+    hint: string | null;
+  } | null>(null);
   // Pool credentials, group, franchisee and segment only apply to CLIENT users.
   const isClient = initialData?.role === "CLIENT";
 
@@ -121,6 +124,7 @@ export default function EditCustomerModal({
         segment: initialData.segment || "",
       }));
       setSavedSubaccounts(initialData.luxorSubaccounts ?? []);
+      setSavedBraiins(null);
       setGroupIsMixed(false);
       setGroupTouched(false);
       setError("");
@@ -233,7 +237,8 @@ export default function EditCustomerModal({
 
       const entries = data.data as Array<{
         id: string;
-        authKey: string;
+        authKey: string | null;
+        authKeyHint: string | null;
         createdAt: string;
         pool: { name: string };
       }>;
@@ -244,12 +249,15 @@ export default function EditCustomerModal({
       const luxorNames = entries
         .filter((entry) => entry.pool.name === "Luxor")
         .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
-        .map((entry) => entry.authKey);
+        .map((entry) => entry.authKey ?? "");
 
       setSavedSubaccounts(luxorNames);
+      // The token never reaches the browser (O3): the field starts empty
+      // and only a newly typed token is sent.
+      setSavedBraiins(braiinsEntry ? { hint: braiinsEntry.authKeyHint } : null);
       setFormData((prev) => ({
         ...prev,
-        braiinsAuthKey: braiinsEntry?.authKey || "",
+        braiinsAuthKey: "",
         luxorSubaccountNames: luxorNames,
       }));
     } catch (err) {
@@ -320,7 +328,9 @@ export default function EditCustomerModal({
           companyUrl: formData.companyUrl,
           // The full set - the server adds/removes the difference.
           luxorSubaccountNames: formData.luxorSubaccountNames,
-          braiinsAuthKey: formData.braiinsAuthKey || null,
+          // Only a newly typed token is sent; blank keeps the saved one
+          // (removing it is the Delete button under Pool Authentication).
+          braiinsAuthKey: formData.braiinsAuthKey?.trim() || undefined,
           // Leave split group memberships alone unless the admin chose a group.
           groupId:
             groupIsMixed && !groupTouched
@@ -526,7 +536,14 @@ export default function EditCustomerModal({
                       braiinsAuthKey: e.target.value,
                     }))
                   }
-                  helperText="Braiins API token for this client, if applicable. Leave blank to remove."
+                  placeholder={
+                    savedBraiins ? "Type a new token to replace it" : undefined
+                  }
+                  helperText={
+                    savedBraiins
+                      ? `A token is saved${savedBraiins.hint ? ` (ends …${savedBraiins.hint})` : ""}. Leave blank to keep it; remove it under Pool Authentication on the customer page.`
+                      : "Braiins API token for this client, if applicable."
+                  }
                 />
                 <FormControl fullWidth disabled={fetchingGroups}>
                   <InputLabel>Group (Optional)</InputLabel>

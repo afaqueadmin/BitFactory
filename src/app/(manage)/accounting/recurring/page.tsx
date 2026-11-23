@@ -31,6 +31,8 @@ import { Customer, useCustomers } from "@/lib/hooks/useInvoices";
 import { CurrencyDisplay } from "@/components/accounting/common/CurrencyDisplay";
 import { DateDisplay } from "@/components/accounting/common/DateDisplay";
 import { useDaylight } from "@/lib/daylight";
+import { useUser } from "@/lib/hooks";
+import { can } from "@/lib/auth/can";
 import {
   DaylightAdminPage,
   DaylightLoading,
@@ -38,6 +40,7 @@ import {
 } from "@/components/daylight/AdminPage";
 
 export default function RecurringInvoicesPage() {
+  const { user } = useUser();
   const { d } = useDaylight();
   const ds = useDaylightAdminSx();
   const [page, setPage] = useState(1);
@@ -182,14 +185,16 @@ export default function RecurringInvoicesPage() {
             Manage monthly billing templates
           </Typography>
         </Box>
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={handleOpenDialog}
-          sx={ds.primaryBtnSx}
-        >
-          Create New
-        </Button>
+        {can(user, "recurring_invoices.manage") && (
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={handleOpenDialog}
+            sx={ds.primaryBtnSx}
+          >
+            Create New
+          </Button>
+        )}
       </Box>
 
       <TableContainer component={Paper} elevation={0} sx={ds.listCardSx}>
@@ -250,24 +255,26 @@ export default function RecurringInvoicesPage() {
                   />
                 </TableCell>
                 <TableCell>
-                  <Box sx={{ display: "flex", gap: 1 }}>
-                    <Button
-                      size="small"
-                      variant="outlined"
-                      startIcon={<EditIcon />}
-                      sx={ds.outlineBtnSx}
-                    >
-                      Edit
-                    </Button>
-                    <Button
-                      size="small"
-                      variant="outlined"
-                      startIcon={<DeleteIcon />}
-                      sx={ds.dangerOutlineBtnSx}
-                    >
-                      Delete
-                    </Button>
-                  </Box>
+                  {can(user, "recurring_invoices.manage") && (
+                    <Box sx={{ display: "flex", gap: 1 }}>
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        startIcon={<EditIcon />}
+                        sx={ds.outlineBtnSx}
+                      >
+                        Edit
+                      </Button>
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        startIcon={<DeleteIcon />}
+                        sx={ds.dangerOutlineBtnSx}
+                      >
+                        Delete
+                      </Button>
+                    </Box>
+                  )}
                 </TableCell>
               </TableRow>
             ))}
@@ -290,13 +297,15 @@ export default function RecurringInvoicesPage() {
           }}
         >
           <span>{selectedIds.length} selected</span>
-          <Button
-            variant="contained"
-            startIcon={<DeleteIcon />}
-            sx={ds.dangerBtnSx}
-          >
-            Delete Selected
-          </Button>
+          {can(user, "recurring_invoices.manage") && (
+            <Button
+              variant="contained"
+              startIcon={<DeleteIcon />}
+              sx={ds.dangerBtnSx}
+            >
+              Delete Selected
+            </Button>
+          )}
         </Paper>
       )}
 

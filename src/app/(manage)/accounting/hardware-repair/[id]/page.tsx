@@ -417,27 +417,32 @@ export default function HardwareRepairInvoiceDetailPage() {
             </Typography>
           </Box>
           <Stack direction="row" spacing={2}>
-            <Button
-              startIcon={<EditIcon />}
-              variant="outlined"
-              disabled={invoice.status !== "DRAFT"}
-              onClick={() =>
-                router.push(`/accounting/hardware-repair/${invoice.id}/edit`)
-              }
-            >
-              Edit
-            </Button>
-            {isAdmin && invoice.status === "DRAFT" && (
+            {can(user, "invoicing.edit") && (
               <Button
-                startIcon={<CheckCircleIcon />}
-                variant="contained"
-                color="success"
-                onClick={handleOpenIssueDialog}
+                startIcon={<EditIcon />}
+                variant="outlined"
+                disabled={invoice.status !== "DRAFT"}
+                onClick={() =>
+                  router.push(`/accounting/hardware-repair/${invoice.id}/edit`)
+                }
               >
-                Issue Invoice
+                Edit
               </Button>
             )}
             {isAdmin &&
+              can(user, "invoicing.issue") &&
+              invoice.status === "DRAFT" && (
+                <Button
+                  startIcon={<CheckCircleIcon />}
+                  variant="contained"
+                  color="success"
+                  onClick={handleOpenIssueDialog}
+                >
+                  Issue Invoice
+                </Button>
+              )}
+            {isAdmin &&
+              can(user, "invoicing.delete") &&
               (invoice.status === "DRAFT" ||
                 invoice.status === "CANCELLED") && (
                 <Button
@@ -449,16 +454,17 @@ export default function HardwareRepairInvoiceDetailPage() {
                   Delete
                 </Button>
               )}
-            {invoice.status === "ISSUED" && (
-              <Button
-                startIcon={<EmailIcon />}
-                variant="outlined"
-                onClick={() => setEmailDialogOpen(true)}
-              >
-                Resend Email
-              </Button>
-            )}
-            {invoice.status === "ISSUED" && (
+            {can(user, "invoicing.send_email") &&
+              invoice.status === "ISSUED" && (
+                <Button
+                  startIcon={<EmailIcon />}
+                  variant="outlined"
+                  onClick={() => setEmailDialogOpen(true)}
+                >
+                  Resend Email
+                </Button>
+              )}
+            {can(user, "invoicing.cancel") && invoice.status === "ISSUED" && (
               <Button
                 startIcon={<CancelIcon />}
                 variant="outlined"
@@ -732,24 +738,26 @@ export default function HardwareRepairInvoiceDetailPage() {
                     </Alert>
                   )}
 
-                  <Button
-                    sx={{ displayPrint: "none" }}
-                    variant="contained"
-                    fullWidth
-                    size="large"
-                    onClick={() =>
-                      router.push(
-                        `/accounting/hardware-repair/${invoice.id}/record-payment`,
-                      )
-                    }
-                    disabled={
-                      invoice.status === "DRAFT" ||
-                      invoice.status === "PAID" ||
-                      invoice.status === "CANCELLED"
-                    }
-                  >
-                    Record Payment
-                  </Button>
+                  {can(user, "invoicing.record_payment") && (
+                    <Button
+                      sx={{ displayPrint: "none" }}
+                      variant="contained"
+                      fullWidth
+                      size="large"
+                      onClick={() =>
+                        router.push(
+                          `/accounting/hardware-repair/${invoice.id}/record-payment`,
+                        )
+                      }
+                      disabled={
+                        invoice.status === "DRAFT" ||
+                        invoice.status === "PAID" ||
+                        invoice.status === "CANCELLED"
+                      }
+                    >
+                      Record Payment
+                    </Button>
+                  )}
 
                   {canMarkUnpaid && invoice.status === "PAID" && (
                     <Button

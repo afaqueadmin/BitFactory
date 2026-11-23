@@ -18,6 +18,7 @@ import {
 } from "@/lib/auth/authorization";
 import { AuditAction } from "@prisma/client";
 import { logPoolCredentialChange } from "@/lib/audit/logPoolCredentialChange";
+import { maskAuthKey } from "@/lib/poolAuthMask";
 import {
   SUBACCOUNT_TX_OPTIONS,
   setLuxorSubaccounts,
@@ -84,8 +85,13 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       orderBy: { createdAt: "desc" },
     });
 
+    const data = poolAuths.map((pa) => ({
+      ...pa,
+      ...maskAuthKey(pa.pool.name, pa.authKey),
+    }));
+
     return NextResponse.json<ApiResponse>(
-      { success: true, data: poolAuths, timestamp: new Date().toISOString() },
+      { success: true, data, timestamp: new Date().toISOString() },
       { status: 200 },
     );
   } catch (error) {
@@ -229,7 +235,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     );
 
     return NextResponse.json<ApiResponse>(
-      { success: true, data: poolAuth, timestamp: new Date().toISOString() },
+      {
+        success: true,
+        data: { ...poolAuth, ...maskAuthKey(pool.name, poolAuth.authKey) },
+        timestamp: new Date().toISOString(),
+      },
       { status: 200 },
     );
   } catch (error) {

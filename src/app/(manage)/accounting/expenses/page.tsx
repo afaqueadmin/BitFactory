@@ -75,6 +75,8 @@ import {
 } from "@/components/daylight/AdminPage";
 import { useDaylight } from "@/lib/daylight";
 import { useExpenseHeads } from "@/lib/hooks/usePaymentAccounts";
+import { useUser } from "@/lib/hooks";
+import { can } from "@/lib/auth/can";
 import {
   Expense,
   ExpensePayment,
@@ -197,6 +199,7 @@ function ExpensesTab({ focusId }: { focusId: string | null }) {
   const { data: heads = [] } = useExpenseHeads();
   const saveExpense = useSaveExpense();
   const savePayment = useSaveExpensePayment();
+  const { user } = useUser();
 
   const [headFilter, setHeadFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState<ExpenseStatus | "">("");
@@ -369,14 +372,16 @@ function ExpensesTab({ focusId }: { focusId: string | null }) {
             exporting={exporting}
             onExport={handleExport}
           />
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={() => setEditing("new")}
-            sx={ds.primaryBtnSx}
-          >
-            Add expense
-          </Button>
+          {can(user, "expenses.create") && (
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={() => setEditing("new")}
+              sx={ds.primaryBtnSx}
+            >
+              Add expense
+            </Button>
+          )}
         </Stack>
       </Stack>
       {exportError && (
@@ -537,55 +542,63 @@ function ExpensesTab({ focusId }: { focusId: string | null }) {
                         spacing={0.5}
                         justifyContent="flex-end"
                       >
-                        <Tooltip
-                          title={
-                            e.status === "PAID"
-                              ? "Fully paid"
-                              : "Record payment"
-                          }
-                        >
-                          <span>
-                            <IconButton
-                              size="small"
-                              onClick={() => setPaying({ expense: e })}
-                              disabled={busy || e.status === "PAID"}
-                            >
-                              <PaymentsIcon fontSize="small" />
-                            </IconButton>
-                          </span>
-                        </Tooltip>
-                        <Tooltip title="Edit">
-                          <IconButton
-                            size="small"
-                            onClick={() => setEditing(e)}
-                            disabled={busy}
+                        {can(user, "expenses.record_payment") && (
+                          <Tooltip
+                            title={
+                              e.status === "PAID"
+                                ? "Fully paid"
+                                : "Record payment"
+                            }
                           >
-                            <EditIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                        <Tooltip
-                          title={
-                            e.payments.length
-                              ? "Delete its payments first"
-                              : "Delete"
-                          }
-                        >
-                          <span>
+                            <span>
+                              <IconButton
+                                size="small"
+                                onClick={() => setPaying({ expense: e })}
+                                disabled={busy || e.status === "PAID"}
+                              >
+                                <PaymentsIcon fontSize="small" />
+                              </IconButton>
+                            </span>
+                          </Tooltip>
+                        )}
+                        {can(user, "expenses.edit") && (
+                          <Tooltip title="Edit">
                             <IconButton
                               size="small"
-                              onClick={() => {
-                                setDeleteError(null);
-                                setDeleting({ kind: "expense", expense: e });
-                              }}
-                              disabled={busy || e.payments.length > 0}
+                              onClick={() => setEditing(e)}
+                              disabled={busy}
                             >
-                              <DeleteIcon
-                                fontSize="small"
-                                color={e.payments.length ? "disabled" : "error"}
-                              />
+                              <EditIcon fontSize="small" />
                             </IconButton>
-                          </span>
-                        </Tooltip>
+                          </Tooltip>
+                        )}
+                        {can(user, "expenses.delete") && (
+                          <Tooltip
+                            title={
+                              e.payments.length
+                                ? "Delete its payments first"
+                                : "Delete"
+                            }
+                          >
+                            <span>
+                              <IconButton
+                                size="small"
+                                onClick={() => {
+                                  setDeleteError(null);
+                                  setDeleting({ kind: "expense", expense: e });
+                                }}
+                                disabled={busy || e.payments.length > 0}
+                              >
+                                <DeleteIcon
+                                  fontSize="small"
+                                  color={
+                                    e.payments.length ? "disabled" : "error"
+                                  }
+                                />
+                              </IconButton>
+                            </span>
+                          </Tooltip>
+                        )}
                       </Stack>
                     </TableCell>
                   </TableRow>
@@ -722,6 +735,8 @@ function PaymentsTable({
   onDelete: (p: ExpensePayment) => void;
 }) {
   const { d } = useDaylight();
+  const { user } = useUser();
+  const canPay = can(user, "expenses.record_payment");
   return (
     <Box sx={{ py: 1.5, pl: { sm: 6 } }}>
       <Typography sx={{ fontSize: 13, fontWeight: 650, mb: 1 }}>
@@ -804,26 +819,32 @@ function PaymentsTable({
                 )}
               </TableCell>
               <TableCell align="right">
-                <Stack direction="row" spacing={0.5} justifyContent="flex-end">
-                  <Tooltip title="Edit payment">
-                    <IconButton
-                      size="small"
-                      onClick={() => onEdit(p)}
-                      disabled={busy}
-                    >
-                      <EditIcon fontSize="small" />
-                    </IconButton>
-                  </Tooltip>
-                  <Tooltip title="Delete payment">
-                    <IconButton
-                      size="small"
-                      onClick={() => onDelete(p)}
-                      disabled={busy}
-                    >
-                      <DeleteIcon fontSize="small" color="error" />
-                    </IconButton>
-                  </Tooltip>
-                </Stack>
+                {canPay && (
+                  <Stack
+                    direction="row"
+                    spacing={0.5}
+                    justifyContent="flex-end"
+                  >
+                    <Tooltip title="Edit payment">
+                      <IconButton
+                        size="small"
+                        onClick={() => onEdit(p)}
+                        disabled={busy}
+                      >
+                        <EditIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                    <Tooltip title="Delete payment">
+                      <IconButton
+                        size="small"
+                        onClick={() => onDelete(p)}
+                        disabled={busy}
+                      >
+                        <DeleteIcon fontSize="small" color="error" />
+                      </IconButton>
+                    </Tooltip>
+                  </Stack>
+                )}
               </TableCell>
             </TableRow>
           ))}

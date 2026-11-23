@@ -256,14 +256,16 @@ export default function PaymentSettingsPage() {
                 >
                   Cancel
                 </Button>
-                <Button
-                  variant="contained"
-                  onClick={handleSave}
-                  disabled={saving}
-                  startIcon={saving && <CircularProgress size={20} />}
-                >
-                  {saving ? "Saving..." : "Save Settings"}
-                </Button>
+                {can(user, "payment_settings.edit") && (
+                  <Button
+                    variant="contained"
+                    onClick={handleSave}
+                    disabled={saving}
+                    startIcon={saving && <CircularProgress size={20} />}
+                  >
+                    {saving ? "Saving..." : "Save Settings"}
+                  </Button>
+                )}
               </Box>
             </Box>
           </CardContent>

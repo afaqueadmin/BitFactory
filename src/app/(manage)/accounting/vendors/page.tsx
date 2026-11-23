@@ -34,6 +34,8 @@ import {
   AccountingVendor,
   useAccountingVendors,
 } from "@/lib/hooks/usePaymentAccounts";
+import { useUser } from "@/lib/hooks";
+import { can } from "@/lib/auth/can";
 import {
   DaylightAdminPage,
   useDaylightAdminSx,
@@ -50,6 +52,7 @@ export default function VendorsPage() {
   const ds = useDaylightAdminSx();
   const { data = [], isLoading, error } = useAccountingVendors();
   const editor = useRecordEditor<AccountingVendor>("vendors");
+  const { user } = useUser();
   const [form, setForm] = useState(emptyForm);
 
   const openForm = (vendor: AccountingVendor | "new") => {
@@ -81,14 +84,16 @@ export default function VendorsPage() {
       </Box>
       <Paper elevation={0} sx={{ ...ds.listCardSx, p: { xs: 2, sm: 3 } }}>
         <Stack direction="row" justifyContent="flex-end" sx={{ mb: 2 }}>
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={() => openForm("new")}
-            sx={ds.primaryBtnSx}
-          >
-            Add vendor
-          </Button>
+          {can(user, "vendors.create") && (
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={() => openForm("new")}
+              sx={ds.primaryBtnSx}
+            >
+              Add vendor
+            </Button>
+          )}
         </Stack>
         {editor.pageError && (
           <Alert severity="error" sx={{ mb: 2, ...ds.alertSx("error") }}>
@@ -157,6 +162,8 @@ export default function VendorsPage() {
                       onEdit={() => openForm(vendor)}
                       onToggle={() => editor.toggle(vendor)}
                       onDelete={() => editor.setDeleting(vendor)}
+                      canEdit={can(user, "vendors.edit")}
+                      canDelete={can(user, "vendors.delete")}
                     />
                   </TableCell>
                 </TableRow>

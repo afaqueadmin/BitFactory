@@ -42,6 +42,8 @@ import {
   Group as GroupIcon,
 } from "@mui/icons-material";
 import { useDaylight } from "@/lib/daylight";
+import { useUser } from "@/lib/hooks";
+import { can } from "@/lib/auth/can";
 import {
   DaylightAdminPage,
   DaylightPageHeader,
@@ -61,7 +63,9 @@ interface PoolAuthEntry {
   id: string;
   poolId: string;
   userId: string;
-  authKey: string;
+  /** null for tokens: they never reach the browser (O3). */
+  authKey: string | null;
+  authKeyHint: string | null;
   createdAt: string;
   updatedAt: string;
   user: { id: string; name: string | null; email: string };
@@ -84,6 +88,8 @@ const emptyPoolForm = { name: "", apiUrl: "", description: "" };
 
 export default function PoolsPage() {
   const { d } = useDaylight();
+  const { user } = useUser();
+  const canManageCredentials = can(user, "pools.manage_credentials");
   const ds = useDaylightAdminSx();
   const [pools, setPools] = useState<Pool[]>([]);
   const [loading, setLoading] = useState(true);
@@ -339,7 +345,8 @@ export default function PoolsPage() {
   const openEditCredentialForm = (entry: PoolAuthEntry) => {
     setEditingCredential(entry);
     setCredentialUserId(entry.userId);
-    setCredentialAuthKey(entry.authKey);
+    // A token starts empty: editing it means typing a new one.
+    setCredentialAuthKey(entry.authKey ?? "");
     setCredentialMessage(null);
     setCredentialFormOpen(true);
   };
@@ -450,14 +457,16 @@ export default function PoolsPage() {
             >
               {isRefreshing ? "Refreshing..." : "Refresh"}
             </Button>
-            <Button
-              variant="contained"
-              startIcon={<AddIcon />}
-              onClick={openCreatePoolDialog}
-              sx={ds.primaryBtnSx}
-            >
-              Add Pool
-            </Button>
+            {can(user, "pools.create") && (
+              <Button
+                variant="contained"
+                startIcon={<AddIcon />}
+                onClick={openCreatePoolDialog}
+                sx={ds.primaryBtnSx}
+              >
+                Add Pool
+              </Button>
+            )}
           </>
         }
       />
@@ -535,29 +544,33 @@ export default function PoolsPage() {
                         <GroupIcon fontSize="small" />
                       </IconButton>
                     </Tooltip>
-                    <Tooltip title="Edit pool">
-                      <IconButton
-                        size="small"
-                        aria-label={`Edit ${pool.name}`}
-                        onClick={() => openEditPoolDialog(pool)}
-                        sx={iconBtnSx()}
-                      >
-                        <EditIcon fontSize="small" />
-                      </IconButton>
-                    </Tooltip>
-                    <Tooltip title="Delete pool">
-                      <IconButton
-                        size="small"
-                        aria-label={`Delete ${pool.name}`}
-                        onClick={() => {
-                          setDeleteError(null);
-                          setDeleteTarget(pool);
-                        }}
-                        sx={iconBtnSx("danger")}
-                      >
-                        <DeleteIcon fontSize="small" />
-                      </IconButton>
-                    </Tooltip>
+                    {can(user, "pools.edit") && (
+                      <Tooltip title="Edit pool">
+                        <IconButton
+                          size="small"
+                          aria-label={`Edit ${pool.name}`}
+                          onClick={() => openEditPoolDialog(pool)}
+                          sx={iconBtnSx()}
+                        >
+                          <EditIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    )}
+                    {can(user, "pools.delete") && (
+                      <Tooltip title="Delete pool">
+                        <IconButton
+                          size="small"
+                          aria-label={`Delete ${pool.name}`}
+                          onClick={() => {
+                            setDeleteError(null);
+                            setDeleteTarget(pool);
+                          }}
+                          sx={iconBtnSx("danger")}
+                        >
+                          <DeleteIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    )}
                   </TableCell>
                 </TableRow>
               ))
@@ -668,14 +681,16 @@ export default function PoolsPage() {
             justifyContent="flex-end"
             sx={{ mb: 2, mt: 1 }}
           >
-            <Button
-              size="small"
-              variant="outlined"
-              startIcon={<AddIcon />}
-              onClick={openAddCredentialForm}
-            >
-              Add Client Credential
-            </Button>
+            {canManageCredentials && (
+              <Button
+                size="small"
+                variant="outlined"
+                startIcon={<AddIcon />}
+                onClick={openAddCredentialForm}
+              >
+                Add Client Credential
+              </Button>
+            )}
           </Stack>
 
           {credentialFormOpen && (
@@ -769,25 +784,29 @@ export default function PoolsPage() {
                         </Typography>
                       </TableCell>
                       <TableCell sx={{ fontFamily: "monospace" }}>
-                        {entry.authKey}
+                        {entry.authKey ?? `•••• ${entry.authKeyHint ?? ""}`}
                       </TableCell>
                       <TableCell>
                         {new Date(entry.updatedAt).toLocaleString()}
                       </TableCell>
                       <TableCell align="right">
-                        <IconButton
-                          size="small"
-                          onClick={() => openEditCredentialForm(entry)}
-                        >
-                          <EditIcon fontSize="small" />
-                        </IconButton>
-                        <IconButton
-                          size="small"
-                          color="error"
-                          onClick={() => setCredentialDeleteTarget(entry)}
-                        >
-                          <DeleteIcon fontSize="small" />
-                        </IconButton>
+                        {canManageCredentials && (
+                          <>
+                            <IconButton
+                              size="small"
+                              onClick={() => openEditCredentialForm(entry)}
+                            >
+                              <EditIcon fontSize="small" />
+                            </IconButton>
+                            <IconButton
+                              size="small"
+                              color="error"
+                              onClick={() => setCredentialDeleteTarget(entry)}
+                            >
+                              <DeleteIcon fontSize="small" />
+                            </IconButton>
+                          </>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))

@@ -18,7 +18,7 @@
  * (/api/secondary-login-requests). The primary login can't be removed here;
  * its email is changed with the account's email (PUT /api/user/[id]).
  */
-import { staffActorLabel } from "@/lib/auth/staffRoles";
+import { staffActorName } from "@/lib/auth/staffActorName";
 import { authorizeStaff } from "@/lib/auth/authorization";
 import type { Permission } from "@/lib/auth/permissions";
 import { NextRequest, NextResponse } from "next/server";
@@ -262,9 +262,7 @@ export async function DELETE(
           entityId: id,
           userId: actor.id,
           changes: { loginId, email: login.email },
-          description: `Sign-in email ${login.email} removed from ${login.user.email} by ${staffActorLabel(
-            actor.role,
-          )} ${actor.email}`,
+          description: `Sign-in email ${login.email} removed from ${login.user.email} by ${await staffActorName(actor)} ${actor.email}`,
           ...meta,
         },
       }),

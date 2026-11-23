@@ -30,6 +30,8 @@ import {
 } from "@/lib/hooks/usePaymentAccounts";
 import { downloadExport } from "@/lib/downloadExport";
 import { useDaylight } from "@/lib/daylight";
+import { useUser } from "@/lib/hooks";
+import { can } from "@/lib/auth/can";
 import {
   DaylightAdminPage,
   DaylightLoading,
@@ -57,6 +59,7 @@ export default function BankStatementPage() {
 
 function BankStatementContent() {
   const ds = useDaylightAdminSx();
+  const { user } = useUser();
   const { d } = useDaylight();
   const router = useRouter();
   const params = useParams();
@@ -177,34 +180,40 @@ function BankStatementContent() {
           flexWrap="wrap"
           useFlexGap
         >
-          <Button
-            variant="outlined"
-            startIcon={<SwapHorizIcon />}
-            onClick={() => setRecordingTransfer(true)}
-            sx={ds.outlineBtnSx}
-          >
-            Record transfer
-          </Button>
+          {can(user, "transfers.create") && (
+            <Button
+              variant="outlined"
+              startIcon={<SwapHorizIcon />}
+              onClick={() => setRecordingTransfer(true)}
+              sx={ds.outlineBtnSx}
+            >
+              Record transfer
+            </Button>
+          )}
           {/* Payment forms only offer active banks, so an inactive one
               can't be pre-filled. */}
-          <Button
-            variant="outlined"
-            startIcon={<PaymentsIcon />}
-            onClick={() => setPayingExpense(true)}
-            disabled={!currentBank?.isActive}
-            sx={ds.outlineBtnSx}
-          >
-            Pay expense
-          </Button>
-          <Button
-            variant="outlined"
-            startIcon={<AddCardIcon />}
-            onClick={() => setAddingIncome(true)}
-            disabled={!currentBank?.isActive}
-            sx={ds.outlineBtnSx}
-          >
-            Add capital &amp; income
-          </Button>
+          {can(user, "expenses.record_payment") && (
+            <Button
+              variant="outlined"
+              startIcon={<PaymentsIcon />}
+              onClick={() => setPayingExpense(true)}
+              disabled={!currentBank?.isActive}
+              sx={ds.outlineBtnSx}
+            >
+              Pay expense
+            </Button>
+          )}
+          {can(user, "capital_income.create") && (
+            <Button
+              variant="outlined"
+              startIcon={<AddCardIcon />}
+              onClick={() => setAddingIncome(true)}
+              disabled={!currentBank?.isActive}
+              sx={ds.outlineBtnSx}
+            >
+              Add capital &amp; income
+            </Button>
+          )}
           <BankPicker banks={banks} current={bankId} onChange={switchBank} />
         </Stack>
       </Box>

@@ -41,34 +41,45 @@ export function RowActions({
   onToggle,
   onDelete,
   busy,
+  canEdit = true,
+  canDelete = true,
 }: {
   isActive: boolean;
   onEdit: () => void;
   onToggle: () => void;
   onDelete: () => void;
   busy: boolean;
+  /** Hide Edit and Activate/Deactivate (both save the record). */
+  canEdit?: boolean;
+  canDelete?: boolean;
 }) {
   return (
     <Stack direction="row" spacing={0.5} justifyContent="flex-end">
-      <Tooltip title="Edit">
-        <IconButton size="small" onClick={onEdit} disabled={busy}>
-          <EditIcon fontSize="small" />
-        </IconButton>
-      </Tooltip>
-      <Tooltip title={isActive ? "Deactivate" : "Activate"}>
-        <IconButton size="small" onClick={onToggle} disabled={busy}>
-          {isActive ? (
-            <ToggleOnIcon fontSize="small" color="success" />
-          ) : (
-            <ToggleOffIcon fontSize="small" />
-          )}
-        </IconButton>
-      </Tooltip>
-      <Tooltip title="Delete">
-        <IconButton size="small" onClick={onDelete} disabled={busy}>
-          <DeleteIcon fontSize="small" color="error" />
-        </IconButton>
-      </Tooltip>
+      {canEdit && (
+        <>
+          <Tooltip title="Edit">
+            <IconButton size="small" onClick={onEdit} disabled={busy}>
+              <EditIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title={isActive ? "Deactivate" : "Activate"}>
+            <IconButton size="small" onClick={onToggle} disabled={busy}>
+              {isActive ? (
+                <ToggleOnIcon fontSize="small" color="success" />
+              ) : (
+                <ToggleOffIcon fontSize="small" />
+              )}
+            </IconButton>
+          </Tooltip>
+        </>
+      )}
+      {canDelete && (
+        <Tooltip title="Delete">
+          <IconButton size="small" onClick={onDelete} disabled={busy}>
+            <DeleteIcon fontSize="small" color="error" />
+          </IconButton>
+        </Tooltip>
+      )}
     </Stack>
   );
 }

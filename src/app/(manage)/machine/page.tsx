@@ -19,6 +19,8 @@ import MinersTable from "@/components/admin/MinersTable";
 import { BulkEditModal } from "@/components/admin/BulkEditModal";
 import { BulkDeleteModal } from "@/components/admin/BulkDeleteModal";
 import { getWarrantyStatus, WARRANTY_EXPIRING_DAYS } from "@/lib/minerWarranty";
+import { useUser } from "@/lib/hooks";
+import { can } from "@/lib/auth/can";
 import AdminValueCard from "@/components/admin/AdminValueCard";
 import {
   DaylightAdminPage,
@@ -134,6 +136,7 @@ interface ApiResponse<T = unknown> {
 
 export default function MachinePage() {
   const ds = useDaylightAdminSx();
+  const { user } = useUser();
   const router = useRouter();
   const [miners, setMiners] = useState<Miner[]>([]);
   const [users, setUsers] = useState<User[]>([]);
@@ -669,31 +672,37 @@ export default function MachinePage() {
             >
               View All Hosted Miner List
             </Button>
-            <Button
-              variant="outlined"
-              onClick={() => setShowBulkEditModal(true)}
-              disabled={loading || formOpen || filtered.length === 0}
-              sx={ds.outlineBtnSx}
-            >
-              Bulk Edit
-            </Button>
-            <Button
-              variant="outlined"
-              onClick={() => setShowBulkDeleteModal(true)}
-              disabled={loading || formOpen || filtered.length === 0}
-              sx={ds.dangerOutlineBtnSx}
-            >
-              Bulk Delete
-            </Button>
-            <Button
-              variant="contained"
-              startIcon={<AddIcon />}
-              onClick={handleCreate}
-              disabled={loading || formOpen}
-              sx={ds.primaryBtnSx}
-            >
-              Add Miner
-            </Button>
+            {can(user, "miners.edit") && (
+              <Button
+                variant="outlined"
+                onClick={() => setShowBulkEditModal(true)}
+                disabled={loading || formOpen || filtered.length === 0}
+                sx={ds.outlineBtnSx}
+              >
+                Bulk Edit
+              </Button>
+            )}
+            {can(user, "miners.bulk_delete") && (
+              <Button
+                variant="outlined"
+                onClick={() => setShowBulkDeleteModal(true)}
+                disabled={loading || formOpen || filtered.length === 0}
+                sx={ds.dangerOutlineBtnSx}
+              >
+                Bulk Delete
+              </Button>
+            )}
+            {can(user, "miners.create") && (
+              <Button
+                variant="contained"
+                startIcon={<AddIcon />}
+                onClick={handleCreate}
+                disabled={loading || formOpen}
+                sx={ds.primaryBtnSx}
+              >
+                Add Miner
+              </Button>
+            )}
           </>
         }
       />
@@ -938,8 +947,8 @@ export default function MachinePage() {
           {/* Miners Table */}
           <MinersTable
             miners={filtered}
-            onEdit={handleEdit}
-            onDelete={handleDelete}
+            onEdit={can(user, "miners.edit") ? handleEdit : undefined}
+            onDelete={can(user, "miners.delete") ? handleDelete : undefined}
             isLoading={loading}
             error={tableError}
             showDeleted={showDeleted}

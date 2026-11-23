@@ -22,6 +22,8 @@ import { formatValue } from "@/lib/helpers/formatValue";
 import FileDownloadOutlinedIcon from "@mui/icons-material/FileDownloadOutlined";
 import Segmented from "@/components/daylight/Segmented";
 import { useDaylight } from "@/lib/daylight";
+import { useUser } from "@/lib/hooks";
+import { can } from "@/lib/auth/can";
 import {
   DaylightAdminPage,
   DaylightLoading,
@@ -75,6 +77,7 @@ const csvCell = (value: string | null) =>
  */
 export default function SimulatedAccountsPage() {
   const { d } = useDaylight();
+  const { user } = useUser();
   const ds = useDaylightAdminSx();
   const [accounts, setAccounts] = useState<SimulatedAccount[]>([]);
   const [requests, setRequests] = useState<SimulationRequest[]>([]);
@@ -334,22 +337,26 @@ export default function SimulatedAccountsPage() {
                       align="right"
                       sx={{ "&&&": { whiteSpace: "nowrap", py: "8px" } }}
                     >
-                      <Button
-                        size="small"
-                        onClick={() => handleRequest(r, "approve")}
-                        disabled={busyId === r.id}
-                        sx={ds.textBtnSx("success")}
-                      >
-                        Approve
-                      </Button>
-                      <Button
-                        size="small"
-                        onClick={() => handleRequest(r, "decline")}
-                        disabled={busyId === r.id}
-                        sx={ds.textBtnSx("danger")}
-                      >
-                        Decline
-                      </Button>
+                      {can(user, "simulated_accounts.review_requests") && (
+                        <>
+                          <Button
+                            size="small"
+                            onClick={() => handleRequest(r, "approve")}
+                            disabled={busyId === r.id}
+                            sx={ds.textBtnSx("success")}
+                          >
+                            Approve
+                          </Button>
+                          <Button
+                            size="small"
+                            onClick={() => handleRequest(r, "decline")}
+                            disabled={busyId === r.id}
+                            sx={ds.textBtnSx("danger")}
+                          >
+                            Decline
+                          </Button>
+                        </>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -451,26 +458,32 @@ export default function SimulatedAccountsPage() {
                         >
                           Ledger
                         </Button>
-                        <Button
-                          size="small"
-                          href={`/customers/${a.id}/wallet-email`}
-                          target="_blank"
-                          rel="noopener"
-                          sx={ds.textBtnSx()}
-                        >
-                          Email wallet
-                        </Button>
-                        {a.active && (
+                        {can(user, "customers.send_wallet_email") && (
                           <Button
                             size="small"
-                            onClick={() => handleConvert(a)}
-                            disabled={busyId === a.id}
+                            href={`/customers/${a.id}/wallet-email`}
+                            target="_blank"
+                            rel="noopener"
                             sx={ds.textBtnSx()}
                           >
-                            Convert to customer
+                            Email wallet
                           </Button>
                         )}
-                        {a.active ? (
+                        {a.active &&
+                          can(user, "simulated_accounts.convert") && (
+                            <Button
+                              size="small"
+                              onClick={() => handleConvert(a)}
+                              disabled={busyId === a.id}
+                              sx={ds.textBtnSx()}
+                            >
+                              Convert to customer
+                            </Button>
+                          )}
+                        {!can(
+                          user,
+                          "simulated_accounts.edit_status",
+                        ) ? null : a.active ? (
                           <Button
                             size="small"
                             onClick={() => handleStatus(a, false)}

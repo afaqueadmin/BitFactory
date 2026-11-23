@@ -43,6 +43,8 @@ import {
 import { useStepUp } from "@/components/StepUpDialog";
 import PayoutTrezorCard from "@/components/guilds/PayoutTrezorCard";
 import { payoutTxUrl } from "@/lib/guilds/walletNetworks";
+import { useUser } from "@/lib/hooks";
+import { can } from "@/lib/auth/can";
 
 interface GuildRow {
   id: string;
@@ -78,6 +80,7 @@ const emptyPerson = (): PersonForm => ({
 
 export default function GuildsPage() {
   const ds = useDaylightAdminSx();
+  const { user } = useUser();
   const [guilds, setGuilds] = useState<GuildRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -108,13 +111,15 @@ export default function GuildsPage() {
         title="Guilds"
         description="Groups that jointly own the miners in one Luxor subaccount. Luxor pays each guild monthly to a Higgs wallet; the reward pays the guild's hosting first, then is split by each member's percentage."
         actions={
-          <Button
-            variant="contained"
-            sx={ds.primaryBtnSx}
-            onClick={() => setCreateOpen(true)}
-          >
-            Create guild
-          </Button>
+          can(user, "guilds.create") && (
+            <Button
+              variant="contained"
+              sx={ds.primaryBtnSx}
+              onClick={() => setCreateOpen(true)}
+            >
+              Create guild
+            </Button>
+          )
         }
       />
 
@@ -490,6 +495,7 @@ const monoSx = {
  */
 function SendPayoutsPanel({ onSent }: { onSent: () => void }) {
   const ds = useDaylightAdminSx();
+  const { user } = useUser();
   const { withStepUp, stepUpDialog } = useStepUp();
   const [queue, setQueue] = useState<PayoutQueue | null>(null);
   const [open, setOpen] = useState(false);
@@ -554,14 +560,16 @@ function SendPayoutsPanel({ onSent }: { onSent: () => void }) {
         <Typography component="h2" sx={{ fontWeight: 650, fontSize: 16 }}>
           Payouts to send
         </Typography>
-        <Button
-          variant="contained"
-          sx={ds.successBtnSx}
-          disabled={queue.ready.length === 0}
-          onClick={() => setOpen(true)}
-        >
-          Mark all ready as sent
-        </Button>
+        {can(user, "guilds.record_payout") && (
+          <Button
+            variant="contained"
+            sx={ds.successBtnSx}
+            disabled={queue.ready.length === 0}
+            onClick={() => setOpen(true)}
+          >
+            Mark all ready as sent
+          </Button>
+        )}
       </Stack>
       {notice && (
         <Alert
@@ -712,6 +720,7 @@ const FEE_PAYERS = [
 /** GuildPayoutSettings: who pays network fees, minimum payout, etc. */
 function PayoutSettingsCard() {
   const ds = useDaylightAdminSx();
+  const { user } = useUser();
   const [form, setForm] = useState<PayoutSettingsData | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -849,14 +858,16 @@ function PayoutSettingsCard() {
         />
       </Box>
       <Stack direction="row" justifyContent="flex-end" sx={{ mt: 2 }}>
-        <Button
-          variant="contained"
-          sx={ds.primaryBtnSx}
-          onClick={save}
-          disabled={saving}
-        >
-          {saving ? "Saving…" : "Save settings"}
-        </Button>
+        {can(user, "guilds.edit_payout_settings") && (
+          <Button
+            variant="contained"
+            sx={ds.primaryBtnSx}
+            onClick={save}
+            disabled={saving}
+          >
+            {saving ? "Saving…" : "Save settings"}
+          </Button>
+        )}
       </Stack>
     </Paper>
   );

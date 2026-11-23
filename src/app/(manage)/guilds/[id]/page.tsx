@@ -51,6 +51,8 @@ import GuildTrezorWallet, {
   type GuildTrezorInfo,
 } from "@/components/guilds/GuildTrezorWallet";
 import TrezorSignDialog from "@/components/guilds/TrezorSignDialog";
+import { useUser } from "@/lib/hooks";
+import { can } from "@/lib/auth/can";
 
 interface Member {
   id: string;
@@ -149,6 +151,9 @@ async function readError(res: Response, fallback: string) {
 
 export default function GuildDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const { user } = useUser();
+  const canEdit = can(user, "guilds.edit");
+  const canCalculate = can(user, "guilds.calculate_distribution");
   const ds = useDaylightAdminSx();
   const { withStepUp, stepUpDialog } = useStepUp();
   const [guild, setGuild] = useState<GuildDetail | null>(null);
@@ -253,7 +258,7 @@ export default function GuildDetailPage() {
             control={
               <Switch
                 checked={guild.isActive}
-                disabled={busy}
+                disabled={busy || !canEdit}
                 onChange={(e) =>
                   act(
                     () =>
@@ -309,16 +314,18 @@ export default function GuildDetailPage() {
             <Typography component="h2" sx={{ fontWeight: 650, fontSize: 16 }}>
               Members
             </Typography>
-            <Button
-              variant="outlined"
-              sx={ds.outlineBtnSx}
-              onClick={() => {
-                setError(null);
-                setAddOpen(true);
-              }}
-            >
-              Add member
-            </Button>
+            {canEdit && (
+              <Button
+                variant="outlined"
+                sx={ds.outlineBtnSx}
+                onClick={() => {
+                  setError(null);
+                  setAddOpen(true);
+                }}
+              >
+                Add member
+              </Button>
+            )}
           </Stack>
           <TableContainer
             component={Paper}
@@ -375,27 +382,31 @@ export default function GuildDetailPage() {
                           spacing={1}
                           alignItems="flex-end"
                         >
-                          <Button
-                            size="small"
-                            variant="outlined"
-                            sx={ds.outlineBtnSx}
-                            disabled={busy}
-                            onClick={() => setHandoverTarget(m)}
-                          >
-                            Make Guildmaster
-                          </Button>
-                          <Button
-                            size="small"
-                            variant="outlined"
-                            sx={ds.dangerOutlineBtnSx}
-                            disabled={busy}
-                            onClick={() => {
-                              setError(null);
-                              setRemoveTarget(m);
-                            }}
-                          >
-                            Remove
-                          </Button>
+                          {can(user, "guilds.handover") && (
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              sx={ds.outlineBtnSx}
+                              disabled={busy}
+                              onClick={() => setHandoverTarget(m)}
+                            >
+                              Make Guildmaster
+                            </Button>
+                          )}
+                          {canEdit && (
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              sx={ds.dangerOutlineBtnSx}
+                              disabled={busy}
+                              onClick={() => {
+                                setError(null);
+                                setRemoveTarget(m);
+                              }}
+                            >
+                              Remove
+                            </Button>
+                          )}
                         </Stack>
                       )}
                     </TableCell>
@@ -430,7 +441,7 @@ export default function GuildDetailPage() {
           <Box>
             <PayoutSetup
               guild={guild}
-              busy={busy}
+              busy={busy || !canEdit}
               onSave={(body, done) =>
                 act(
                   () => postJson(`/api/guilds/${guild.id}`, body, "PATCH"),
@@ -502,22 +513,24 @@ export default function GuildDetailPage() {
                 InputLabelProps={{ shrink: true }}
                 sx={ds.inputSx}
               />
-              <Button
-                variant="contained"
-                sx={ds.primaryBtnSx}
-                disabled={busy || !runMonth}
-                onClick={() =>
-                  act(
-                    () =>
-                      postJson(`/api/guilds/${guild.id}/distributions`, {
-                        rewardMonth: runMonth,
-                      }),
-                    `Distribution for ${formatMonth(`${runMonth}-01T00:00:00Z`)} calculated`,
-                  )
-                }
-              >
-                Calculate
-              </Button>
+              {canCalculate && (
+                <Button
+                  variant="contained"
+                  sx={ds.primaryBtnSx}
+                  disabled={busy || !runMonth}
+                  onClick={() =>
+                    act(
+                      () =>
+                        postJson(`/api/guilds/${guild.id}/distributions`, {
+                          rewardMonth: runMonth,
+                        }),
+                      `Distribution for ${formatMonth(`${runMonth}-01T00:00:00Z`)} calculated`,
+                    )
+                  }
+                >
+                  Calculate
+                </Button>
+              )}
             </Stack>
           </Stack>
 
@@ -764,28 +777,34 @@ export default function GuildDetailPage() {
                       sx={{ mt: 1.5 }}
                       justifyContent="flex-end"
                     >
-                      <Button
-                        variant="outlined"
-                        sx={ds.outlineBtnSx}
-                        disabled={
-                          busy || !["CALCULATED", "HELD"].includes(d.status)
-                        }
-                        onClick={() =>
-                          act(
-                            () =>
-                              postJson(
-                                `/api/guilds/${guild.id}/distributions`,
-                                {
-                                  rewardMonth: d.rewardMonth.slice(0, 7),
-                                },
-                              ),
-                            "Recalculated at today's BTC price",
-                          )
-                        }
-                      >
-                        Recalculate
-                      </Button>
-                      {guild.trezorAccount !== null ? (
+                      {canCalculate && (
+                        <Button
+                          variant="outlined"
+                          sx={ds.outlineBtnSx}
+                          disabled={
+                            busy || !["CALCULATED", "HELD"].includes(d.status)
+                          }
+                          onClick={() =>
+                            act(
+                              () =>
+                                postJson(
+                                  `/api/guilds/${guild.id}/distributions`,
+                                  {
+                                    rewardMonth: d.rewardMonth.slice(0, 7),
+                                  },
+                                ),
+                              "Recalculated at today's BTC price",
+                            )
+                          }
+                        >
+                          Recalculate
+                        </Button>
+                      )}
+                      {/* Both need guilds.record_payout, as their routes do. */}
+                      {!can(
+                        user,
+                        "guilds.record_payout",
+                      ) ? null : guild.trezorAccount !== null ? (
                         <Button
                           variant="contained"
                           sx={ds.successBtnSx}

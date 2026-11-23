@@ -61,6 +61,8 @@ import {
   useDaylightAdminSx,
 } from "@/components/daylight/AdminPage";
 import { useDaylight } from "@/lib/daylight";
+import { useUser } from "@/lib/hooks";
+import { can } from "@/lib/auth/can";
 import {
   BankTransfer,
   BankTransferSide,
@@ -119,6 +121,7 @@ export function TransfersTab() {
   const { data: entities = [] } = useAccountingEntities();
   const { data: banks = [] } = useAccountingBanks();
   const save = useSaveBankTransfer();
+  const { user } = useUser();
   const [entityFilter, setEntityFilter] = useState("");
   const [bankFilter, setBankFilter] = useState("");
   const [from, setFrom] = useState("");
@@ -249,14 +252,16 @@ export function TransfersTab() {
             exporting={exporting}
             onExport={handleExport}
           />
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={() => setEditing("new")}
-            sx={ds.primaryBtnSx}
-          >
-            Record transfer
-          </Button>
+          {can(user, "transfers.create") && (
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={() => setEditing("new")}
+              sx={ds.primaryBtnSx}
+            >
+              Record transfer
+            </Button>
+          )}
         </Stack>
       </Stack>
       {exportError && (
@@ -377,27 +382,31 @@ export function TransfersTab() {
                     spacing={0.5}
                     justifyContent="flex-end"
                   >
-                    <Tooltip title="Edit">
-                      <IconButton
-                        size="small"
-                        onClick={() => setEditing(t)}
-                        disabled={save.isPending}
-                      >
-                        <EditIcon fontSize="small" />
-                      </IconButton>
-                    </Tooltip>
-                    <Tooltip title="Delete">
-                      <IconButton
-                        size="small"
-                        onClick={() => {
-                          setDeleteError(null);
-                          setDeleting(t);
-                        }}
-                        disabled={save.isPending}
-                      >
-                        <DeleteIcon fontSize="small" color="error" />
-                      </IconButton>
-                    </Tooltip>
+                    {can(user, "transfers.edit") && (
+                      <Tooltip title="Edit">
+                        <IconButton
+                          size="small"
+                          onClick={() => setEditing(t)}
+                          disabled={save.isPending}
+                        >
+                          <EditIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    )}
+                    {can(user, "transfers.delete") && (
+                      <Tooltip title="Delete">
+                        <IconButton
+                          size="small"
+                          onClick={() => {
+                            setDeleteError(null);
+                            setDeleting(t);
+                          }}
+                          disabled={save.isPending}
+                        >
+                          <DeleteIcon fontSize="small" color="error" />
+                        </IconButton>
+                      </Tooltip>
+                    )}
                   </Stack>
                 </TableCell>
               </TableRow>

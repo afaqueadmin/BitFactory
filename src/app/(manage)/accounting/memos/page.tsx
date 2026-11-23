@@ -25,6 +25,8 @@ import MemoTransactionsTable from "@/components/admin/MemoTransactionsTable";
 import CreateMemoModal from "@/components/CreateMemoModal";
 import MemoHistoryDialog from "@/components/MemoHistoryDialog";
 import { useDaylight } from "@/lib/daylight";
+import { useUser } from "@/lib/hooks";
+import { can } from "@/lib/auth/can";
 import {
   DaylightAdminPage,
   useDaylightAdminSx,
@@ -55,6 +57,7 @@ export default function MemosPage() {
 
 function MemosContent() {
   const { d, fonts } = useDaylight();
+  const { user } = useUser();
   const ds = useDaylightAdminSx();
   const searchParams = useSearchParams();
 
@@ -214,14 +217,16 @@ function MemosContent() {
             direction) or kept as an internal record only.
           </Typography>
         </Box>
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={() => setAddModalOpen(true)}
-          sx={ds.primaryBtnSx}
-        >
-          Create Memo
-        </Button>
+        {can(user, "memos.create") && (
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={() => setAddModalOpen(true)}
+            sx={ds.primaryBtnSx}
+          >
+            Create Memo
+          </Button>
+        )}
       </Box>
 
       {error && (
@@ -368,7 +373,7 @@ function MemosContent() {
         sortOrder={sortOrder}
         onSortChange={handleSortChange}
         onViewHistory={handleViewHistory}
-        onVoid={handleVoidClick}
+        onVoid={can(user, "memos.void") ? handleVoidClick : undefined}
         onDownload={handleDownload}
       />
 
