@@ -5,6 +5,7 @@ import {
   requirePermission,
 } from "@/lib/auth/authorization";
 import { franchiseeUserFilter } from "@/lib/franchiseeScope";
+import { credentialLabel } from "@/lib/poolAuthMask";
 
 interface ApiResponse<T = unknown> {
   success: boolean;
@@ -35,6 +36,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       select: {
         id: true,
         authKey: true,
+        pool: { select: { name: true } },
         user: {
           select: {
             id: true,
@@ -68,7 +70,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       .map((pa) => ({
         id: pa.id,
         poolAuthId: pa.id,
-        subaccountName: pa.authKey,
+        subaccountName: credentialLabel(pa.pool.name, pa.authKey),
         user: {
           id: pa.user.id,
           name: pa.user.name || "Unknown",

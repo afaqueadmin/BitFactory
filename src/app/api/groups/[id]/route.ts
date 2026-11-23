@@ -18,6 +18,7 @@ import {
 } from "@/lib/auth/authorization";
 import { AuditAction } from "@prisma/client";
 import { franchiseeUserFilter } from "@/lib/franchiseeScope";
+import { credentialLabel } from "@/lib/poolAuthMask";
 
 /**
  * API Response Type
@@ -171,6 +172,7 @@ export async function GET(
       select: {
         id: true,
         authKey: true,
+        pool: { select: { name: true } },
         user: {
           select: {
             id: true,
@@ -196,7 +198,7 @@ export async function GET(
       .map((pa) => ({
         id: pa.id,
         poolAuthId: pa.id,
-        subaccountName: pa.authKey,
+        subaccountName: credentialLabel(pa.pool.name, pa.authKey),
         addedAt: new Date().toISOString(),
         user: {
           id: pa.user.id,

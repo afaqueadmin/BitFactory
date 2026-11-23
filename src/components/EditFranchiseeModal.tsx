@@ -69,11 +69,15 @@ export default function EditFranchiseeModal({
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState(toFormData(franchise));
   const [error, setError] = useState("");
+  const [savedBraiins, setSavedBraiins] = useState<{
+    hint: string | null;
+  } | null>(null);
 
   useEffect(() => {
     if (open) {
       setFormData(toFormData(franchise));
       setError("");
+      setSavedBraiins(null);
       if (franchise?.franchisee?.id) {
         loadCurrentBraiinsAuth(franchise.franchisee.id);
       }
@@ -94,13 +98,15 @@ export default function EditFranchiseeModal({
       if (!data.success || !Array.isArray(data.data)) return;
 
       const braiinsEntry = (
-        data.data as Array<{ authKey: string; pool: { name: string } }>
+        data.data as Array<{
+          authKeyHint: string | null;
+          pool: { name: string };
+        }>
       ).find((entry) => entry.pool.name === "Braiins");
 
-      setFormData((prev) => ({
-        ...prev,
-        braiinsAuthKey: braiinsEntry?.authKey || "",
-      }));
+      // The token never reaches the browser (O3): the field stays empty
+      // and only a newly typed token is sent.
+      setSavedBraiins(braiinsEntry ? { hint: braiinsEntry.authKeyHint } : null);
     } catch (err) {
       console.error(
         "[EditFranchiseeModal] Error loading current Braiins credential:",
@@ -142,7 +148,11 @@ export default function EditFranchiseeModal({
       const response = await fetch(`/api/franchisees/${franchise.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
+        // Blank keeps the saved Braiins token; the server removes it on "".
+        body: JSON.stringify({
+          ...formData,
+          braiinsAuthKey: formData.braiinsAuthKey.trim() || undefined,
+        }),
       });
 
       const data = await response.json();
@@ -261,7 +271,14 @@ export default function EditFranchiseeModal({
                   braiinsAuthKey: e.target.value,
                 }))
               }
-              helperText="Braiins API token for this franchisee, if applicable. Leave blank to remove."
+              placeholder={
+                savedBraiins ? "Type a new token to replace it" : undefined
+              }
+              helperText={
+                savedBraiins
+                  ? `A token is saved${savedBraiins.hint ? ` (ends …${savedBraiins.hint})` : ""}. Leave blank to keep it; remove it on the Pools page (Manage client credentials).`
+                  : "Braiins API token for this franchisee, if applicable."
+              }
             />
 
             <TextField

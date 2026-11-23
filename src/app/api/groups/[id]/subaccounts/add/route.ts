@@ -5,6 +5,7 @@ import {
   requirePermission,
 } from "@/lib/auth/authorization";
 import { AuditAction } from "@prisma/client";
+import { groupSubaccountName } from "@/lib/poolAuthMask";
 
 /**
  * POST /api/groups/[id]/subaccounts/add
@@ -52,7 +53,7 @@ export async function POST(
 
       const poolAuth = await prisma.poolAuth.findUnique({
         where: { id: poolAuthId },
-        select: { id: true, authKey: true },
+        select: { id: true, authKey: true, pool: { select: { name: true } } },
       });
 
       if (!poolAuth) {
@@ -81,7 +82,10 @@ export async function POST(
       groupSubaccount = await prisma.groupSubaccount.create({
         data: {
           groupId,
-          subaccountName: poolAuth.authKey,
+          subaccountName: groupSubaccountName(
+            poolAuth.pool.name,
+            poolAuth.authKey,
+          ),
           poolAuthId: poolAuth.id,
           addedBy: authenticatedUserId,
           addedByUserId: authenticatedUserId,

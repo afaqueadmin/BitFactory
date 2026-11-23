@@ -38,7 +38,9 @@ interface PoolOption {
 interface PoolAuthEntry {
   id: string;
   poolId: string;
-  authKey: string;
+  /** null for tokens: they never reach the browser (O3). */
+  authKey: string | null;
+  authKeyHint: string | null;
   updatedAt: string;
   pool: { id: string; name: string };
 }
@@ -120,7 +122,8 @@ export default function PoolAuthSection({
   const openEditForm = (entry: PoolAuthEntry) => {
     setEditing(entry);
     setFormPoolId(entry.poolId);
-    setFormAuthKey(entry.authKey);
+    // A token starts empty: editing it means typing a new one.
+    setFormAuthKey(entry.authKey ?? "");
     setFormError(null);
     setFormOpen(true);
   };
@@ -300,7 +303,7 @@ export default function PoolAuthSection({
                     {entry.pool.name}
                   </TableCell>
                   <TableCell sx={{ fontFamily: "monospace" }}>
-                    {entry.authKey}
+                    {entry.authKey ?? `•••• ${entry.authKeyHint ?? ""}`}
                   </TableCell>
                   <TableCell>
                     {new Date(entry.updatedAt).toLocaleString()}

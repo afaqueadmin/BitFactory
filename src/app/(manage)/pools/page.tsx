@@ -63,7 +63,9 @@ interface PoolAuthEntry {
   id: string;
   poolId: string;
   userId: string;
-  authKey: string;
+  /** null for tokens: they never reach the browser (O3). */
+  authKey: string | null;
+  authKeyHint: string | null;
   createdAt: string;
   updatedAt: string;
   user: { id: string; name: string | null; email: string };
@@ -343,7 +345,8 @@ export default function PoolsPage() {
   const openEditCredentialForm = (entry: PoolAuthEntry) => {
     setEditingCredential(entry);
     setCredentialUserId(entry.userId);
-    setCredentialAuthKey(entry.authKey);
+    // A token starts empty: editing it means typing a new one.
+    setCredentialAuthKey(entry.authKey ?? "");
     setCredentialMessage(null);
     setCredentialFormOpen(true);
   };
@@ -781,7 +784,7 @@ export default function PoolsPage() {
                         </Typography>
                       </TableCell>
                       <TableCell sx={{ fontFamily: "monospace" }}>
-                        {entry.authKey}
+                        {entry.authKey ?? `•••• ${entry.authKeyHint ?? ""}`}
                       </TableCell>
                       <TableCell>
                         {new Date(entry.updatedAt).toLocaleString()}
