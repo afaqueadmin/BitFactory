@@ -610,72 +610,6 @@ export class LuxorClient {
     }
   }
 
-  /**
-   * Create a new subaccount in a specific site
-   * POST /pool/subaccounts
-   *
-   * @param name - Subaccount name
-   * @param siteId - Site UUID where the subaccount will be created
-   */
-  async createSubaccount(name: string, siteId: string): Promise<Subaccount> {
-    try {
-      console.log(
-        `[LuxorClient] POST /pool/subaccounts - Name: ${name}, Site: ${siteId} - User: ${this.userIdentifier}`,
-      );
-      const response = await this.client.post<Subaccount>("/pool/subaccounts", {
-        name,
-        site_id: siteId,
-      });
-      return response.data;
-    } catch (error) {
-      throw error;
-    }
-  }
-
-  /**
-   * Update a subaccount (move to different site)
-   * PUT /pool/subaccounts/:subaccountName
-   */
-  async updateSubaccount(
-    subaccountName: string,
-    siteId: string,
-  ): Promise<Record<string, unknown>> {
-    try {
-      console.log(
-        `[LuxorClient] PUT /pool/subaccounts/${subaccountName} - Site: ${siteId} - User: ${this.userIdentifier}`,
-      );
-      const response = await this.client.put<Record<string, unknown>>(
-        `/pool/subaccounts/${subaccountName}`,
-        {
-          site_id: siteId,
-        },
-      );
-      return response.data;
-    } catch (error) {
-      throw error;
-    }
-  }
-
-  /**
-   * Delete a subaccount
-   * DELETE /pool/subaccounts/:subaccountName
-   */
-  async deleteSubaccount(
-    subaccountName: string,
-  ): Promise<Record<string, unknown>> {
-    try {
-      console.log(
-        `[LuxorClient] DELETE /pool/subaccounts/${subaccountName} - User: ${this.userIdentifier}`,
-      );
-      const response = await this.client.delete<Record<string, unknown>>(
-        `/pool/subaccounts/${subaccountName}`,
-      );
-      return response.data;
-    } catch (error) {
-      throw error;
-    }
-  }
-
   // ========================================================================
   // PAYMENT SETTINGS METHODS
   // ========================================================================
@@ -732,52 +666,6 @@ export class LuxorClient {
       );
       const response = await this.client.get<PaymentSettingsSingleResponse>(
         `/pool/payment-settings/${currency}/${subaccountName}`,
-      );
-      return response.data;
-    } catch (error) {
-      throw error;
-    }
-  }
-
-  /**
-   * Create payment settings for a subaccount
-   * POST /pool/payment-settings/:currency/:subaccountName
-   */
-  async createPaymentSettings(
-    currency: string,
-    subaccountName: string,
-    settings: CreatePaymentSettingsRequest,
-  ): Promise<Record<string, unknown>> {
-    try {
-      console.log(
-        `[LuxorClient] POST /pool/payment-settings/${currency}/${subaccountName} - User: ${this.userIdentifier}`,
-      );
-      const response = await this.client.post<Record<string, unknown>>(
-        `/pool/payment-settings/${currency}/${subaccountName}`,
-        settings,
-      );
-      return response.data;
-    } catch (error) {
-      throw error;
-    }
-  }
-
-  /**
-   * Update payment settings for a subaccount
-   * PUT /pool/payment-settings/:currency/:subaccountName
-   */
-  async updatePaymentSettings(
-    currency: string,
-    subaccountName: string,
-    settings: UpdatePaymentSettingsRequest,
-  ): Promise<Record<string, unknown>> {
-    try {
-      console.log(
-        `[LuxorClient] PUT /pool/payment-settings/${currency}/${subaccountName} - User: ${this.userIdentifier}`,
-      );
-      const response = await this.client.put<Record<string, unknown>>(
-        `/pool/payment-settings/${currency}/${subaccountName}`,
-        settings,
       );
       return response.data;
     } catch (error) {
@@ -1042,56 +930,37 @@ export class LuxorClient {
   }
 
   // ========================================================================
-  // GENERIC REQUEST METHOD
+  // GENERIC READ
   // ========================================================================
 
   /**
-   * Generic request method for any endpoint
-   * Useful for testing or accessing endpoints not yet implemented
+   * GET any pool endpoint (e.g. /pool/workers/BTC for workers/stats).
+   * Read only on purpose: the app never changes anything on a pool.
    *
    * @param path - API endpoint path (without base URL)
    * @param params - Query parameters
-   * @param method - HTTP method (default: GET)
-   * @param body - Request body for POST/PUT/PATCH
    */
   async request<T = Record<string, unknown>>(
     path: string,
     params?: Record<string, unknown>,
-    method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE" = "GET",
-    body?: Record<string, unknown>,
   ): Promise<T> {
-    try {
-      const queryString = params
-        ? new URLSearchParams(
-            Object.entries(params).reduce(
-              (acc: Record<string, string>, [key, value]) => {
-                if (value !== undefined && value !== null) {
-                  acc[key] = String(value);
-                }
-                return acc;
-              },
-              {},
-            ),
-          ).toString()
-        : "";
-
-      const url = queryString ? `${path}?${queryString}` : path;
-
-      console.log(
-        `[LuxorClient] ${method} ${url} - User: ${this.userIdentifier}`,
-      );
-
-      const config = {
-        method: method.toLowerCase(),
-        url,
-        data: body,
-      };
-
-      const response = await this.client.request<T>(config);
-      return response.data;
-    } catch (error) {
-      throw error;
-    }
+    const queryString = params
+      ? new URLSearchParams(
+          Object.entries(params).reduce(
+            (acc: Record<string, string>, [key, value]) => {
+              if (value !== undefined && value !== null) {
+                acc[key] = String(value);
+              }
+              return acc;
+            },
+            {},
+          ),
+        ).toString()
+      : "";
+    const url = queryString ? `${path}?${queryString}` : path;
+    console.log(`[LuxorClient] GET ${url} - User: ${this.userIdentifier}`);
+    const response = await this.client.get<T>(url);
+    return response.data;
   }
 
   // ========================================================================
