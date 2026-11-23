@@ -67,6 +67,8 @@ import {
   useDaylightAdminSx,
 } from "@/components/daylight/AdminPage";
 import { useDaylight } from "@/lib/daylight";
+import { useUser } from "@/lib/hooks";
+import { can } from "@/lib/auth/can";
 import { useAccountingBanks } from "@/lib/hooks/usePaymentAccounts";
 import {
   ReconciliationEntry,
@@ -153,6 +155,7 @@ function EntriesTable({ focusId }: { focusId: string | null }) {
   const { data = [], isLoading, error } = useBankReconciliation();
   const { data: banks = [] } = useAccountingBanks();
   const save = useSaveReconciliation();
+  const { user } = useUser();
 
   const [typeFilter, setTypeFilter] = useState("");
   const [bankFilter, setBankFilter] = useState("");
@@ -290,14 +293,16 @@ function EntriesTable({ focusId }: { focusId: string | null }) {
             exporting={exporting}
             onExport={handleExport}
           />
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={() => setEditing("new")}
-            sx={ds.primaryBtnSx}
-          >
-            Add entry
-          </Button>
+          {can(user, "bank_reconciliation.create") && (
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={() => setEditing("new")}
+              sx={ds.primaryBtnSx}
+            >
+              Add entry
+            </Button>
+          )}
         </Stack>
       </Stack>
       {exportError && (
@@ -432,27 +437,31 @@ function EntriesTable({ focusId }: { focusId: string | null }) {
                     spacing={0.5}
                     justifyContent="flex-end"
                   >
-                    <Tooltip title="Edit">
-                      <IconButton
-                        size="small"
-                        onClick={() => setEditing(e)}
-                        disabled={save.isPending}
-                      >
-                        <EditIcon fontSize="small" />
-                      </IconButton>
-                    </Tooltip>
-                    <Tooltip title="Delete">
-                      <IconButton
-                        size="small"
-                        onClick={() => {
-                          setDeleteError(null);
-                          setDeleting(e);
-                        }}
-                        disabled={save.isPending}
-                      >
-                        <DeleteIcon fontSize="small" color="error" />
-                      </IconButton>
-                    </Tooltip>
+                    {can(user, "bank_reconciliation.edit") && (
+                      <Tooltip title="Edit">
+                        <IconButton
+                          size="small"
+                          onClick={() => setEditing(e)}
+                          disabled={save.isPending}
+                        >
+                          <EditIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    )}
+                    {can(user, "bank_reconciliation.delete") && (
+                      <Tooltip title="Delete">
+                        <IconButton
+                          size="small"
+                          onClick={() => {
+                            setDeleteError(null);
+                            setDeleting(e);
+                          }}
+                          disabled={save.isPending}
+                        >
+                          <DeleteIcon fontSize="small" color="error" />
+                        </IconButton>
+                      </Tooltip>
+                    )}
                   </Stack>
                 </TableCell>
               </TableRow>

@@ -52,6 +52,8 @@ import {
 import { ExpenseHead, useExpenseHeads } from "@/lib/hooks/usePaymentAccounts";
 import { useDaylightAdminSx } from "@/components/daylight/AdminPage";
 import { useDaylight } from "@/lib/daylight";
+import { useUser } from "@/lib/hooks";
+import { can } from "@/lib/auth/can";
 
 const numSx = {
   whiteSpace: "nowrap",
@@ -62,6 +64,8 @@ export function ExpenseHeadsTab() {
   const ds = useDaylightAdminSx();
   const { d } = useDaylight();
   const { data = [], isLoading, error } = useExpenseHeads();
+  const { user } = useUser();
+  const canManage = can(user, "expenses.manage_heads");
   const editor = useRecordEditor<ExpenseHead>("expense-heads");
   const [name, setName] = useState("");
   const [statusFilter, setStatusFilter] = useState<HeadStatusFilter>("");
@@ -133,14 +137,16 @@ export function ExpenseHeadsTab() {
             exporting={exporting}
             onExport={handleExport}
           />
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={() => openForm("new")}
-            sx={ds.primaryBtnSx}
-          >
-            Add head
-          </Button>
+          {canManage && (
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={() => openForm("new")}
+              sx={ds.primaryBtnSx}
+            >
+              Add head
+            </Button>
+          )}
         </Stack>
       </Stack>
       {exportError && (
@@ -207,13 +213,15 @@ export function ExpenseHeadsTab() {
                   />
                 </TableCell>
                 <TableCell align="right">
-                  <RowActions
-                    isActive={head.isActive}
-                    busy={editor.busy}
-                    onEdit={() => openForm(head)}
-                    onToggle={() => editor.toggle(head)}
-                    onDelete={() => editor.setDeleting(head)}
-                  />
+                  {canManage && (
+                    <RowActions
+                      isActive={head.isActive}
+                      busy={editor.busy}
+                      onEdit={() => openForm(head)}
+                      onToggle={() => editor.toggle(head)}
+                      onDelete={() => editor.setDeleting(head)}
+                    />
+                  )}
                 </TableCell>
               </TableRow>
             ))}
