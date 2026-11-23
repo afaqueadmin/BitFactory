@@ -6,6 +6,11 @@ vi.mock("@/lib/prisma", () => ({ prisma: {} }));
 import { parseRoleBody } from "@/lib/auth/customRoles";
 import { canManageAccount } from "@/lib/auth/accountTiers";
 import { isStaffRole } from "@/lib/auth/staffRoles";
+import {
+  ALL_PERMISSIONS,
+  SA_ONLY,
+  effectivePermissions,
+} from "@/lib/auth/permissions";
 
 describe("parseRoleBody", () => {
   it("accepts grantable permissions, trimmed and de-duplicated", () => {
@@ -43,6 +48,14 @@ describe("parseRoleBody", () => {
 });
 
 describe("STAFF system role", () => {
+  it("with every grantable permission equals ADMIN (the Admin/Accounting move)", () => {
+    const grantable = ALL_PERMISSIONS.filter((p) => !SA_ONLY.has(p));
+    expect(grantable).toHaveLength(162);
+    expect([...effectivePermissions("STAFF", grantable)].sort()).toEqual(
+      [...effectivePermissions("ADMIN", [])].sort(),
+    );
+  });
+
   it("is a staff role", () => {
     expect(isStaffRole("STAFF")).toBe(true);
   });
