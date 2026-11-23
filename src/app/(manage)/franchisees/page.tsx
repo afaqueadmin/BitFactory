@@ -1,4 +1,4 @@
-import { can } from "@/lib/auth/can";
+"use client";
 /**
  * src/app/(manage)/franchisees/page.tsx
  * Franchisee Management Page
@@ -6,7 +6,7 @@ import { can } from "@/lib/auth/can";
  * Admin page for viewing franchises and creating new franchisees.
  */
 
-("use client");
+import { can } from "@/lib/auth/can";
 
 import { isStaffRole } from "@/lib/auth/staffRoles";
 import React, { useState, useEffect, useCallback } from "react";

@@ -1,11 +1,11 @@
-import { can } from "@/lib/auth/can";
+"use client";
 /**
  * src/app/(manage)/accounting/hardware-repair/[id]/page.tsx
  * Hardware Repair Invoice Detail Page
  *
  * Display full invoice details for hardware repair invoices
  */
-("use client");
+import { can } from "@/lib/auth/can";
 
 import { BankEffectNotice } from "@/components/accounting/common/BankEffectNotice";
 import { CONFIRM_BANK_EFFECT, useBankEffect } from "@/lib/hooks/useBankEffect";
