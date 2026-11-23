@@ -15,13 +15,14 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
-import { requireStaff, jsonError } from "@/lib/guilds/routeAuth";
+import { jsonError } from "@/lib/guilds/routeAuth";
+import { authorizeStaff } from "@/lib/auth/authorization";
 import { verifyStepUp } from "@/lib/auth/stepUp";
 import {
   TrezorSetupError,
   connectPayoutTrezor,
   inspectAccounts,
+  payoutApproverCandidates,
   setApprovers,
   setMaxFeeRate,
   trezorStatus,
@@ -29,8 +30,6 @@ import {
 } from "@/lib/guilds/trezor/device";
 import { TrezorAccountError } from "@/lib/guilds/trezor/account";
 import { MempoolError } from "@/lib/guilds/trezor/mempool";
-
-const ADMIN_ROLES = ["ADMIN", "SUPER_ADMIN"];
 
 function knownError(error: unknown): string | null {
   if (
@@ -78,19 +77,12 @@ function parseRead(value: unknown): ReadTrezor | null {
 }
 
 export async function GET(request: NextRequest) {
-  const auth = await requireStaff(request);
-  if ("error" in auth) return auth.error;
-  if (!ADMIN_ROLES.includes(auth.decoded.role)) {
-    return jsonError("Admin access required", 403);
-  }
+  const auth = await authorizeStaff(request, ["guilds.view"]);
+  if ("response" in auth) return auth.response;
   try {
     const [status, admins] = await Promise.all([
       trezorStatus(),
-      prisma.user.findMany({
-        where: { role: { in: ["ADMIN", "SUPER_ADMIN"] }, isDeleted: false },
-        select: { id: true, name: true, email: true },
-        orderBy: { email: "asc" },
-      }),
+      payoutApproverCandidates(),
     ]);
     return NextResponse.json({ success: true, data: { ...status, admins } });
   } catch (error) {
@@ -100,11 +92,8 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const auth = await requireStaff(request);
-  if ("error" in auth) return auth.error;
-  if (!ADMIN_ROLES.includes(auth.decoded.role)) {
-    return jsonError("Admin access required", 403);
-  }
+  const auth = await authorizeStaff(request, ["guilds.view"]);
+  if ("response" in auth) return auth.response;
 
   try {
     const body = (await request.json().catch(() => ({}))) as {
@@ -129,6 +118,9 @@ export async function POST(request: NextRequest) {
     const actions = ["connect", "set-approvers", "set-max-fee"];
     if (!body.action || !actions.includes(body.action)) {
       return jsonError("Unknown action");
+    }
+    if (!auth.permissions.has("guilds.edit_payout_settings")) {
+      return jsonError("You don't have permission to do this", 403);
     }
 
     const stepUp = await verifyStepUp(

@@ -17,7 +17,8 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireStaff, jsonError } from "@/lib/guilds/routeAuth";
+import { jsonError } from "@/lib/guilds/routeAuth";
+import { authorizeStaff } from "@/lib/auth/authorization";
 import { verifyStepUp } from "@/lib/auth/stepUp";
 import { trezorErrorMessage } from "@/lib/guilds/trezor/routeErrors";
 import {
@@ -28,17 +29,12 @@ import { saveSeals, sealTargets } from "@/lib/guilds/trezor/seals";
 import { syncGuildCoins } from "@/lib/guilds/trezor/coins";
 import { isTrezorPayoutEnabled } from "@/lib/guilds/trezor/network";
 
-const ADMIN_ROLES = ["ADMIN", "SUPER_ADMIN"];
-
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const auth = await requireStaff(request);
-  if ("error" in auth) return auth.error;
-  if (!ADMIN_ROLES.includes(auth.decoded.role)) {
-    return jsonError("Admin access required", 403);
-  }
+  const auth = await authorizeStaff(request, ["guilds.view"]);
+  if ("response" in auth) return auth.response;
   const { id } = await params;
   if (!isTrezorPayoutEnabled()) {
     return NextResponse.json({ success: true, data: { enabled: false } });
@@ -73,11 +69,8 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const auth = await requireStaff(request);
-  if ("error" in auth) return auth.error;
-  if (!ADMIN_ROLES.includes(auth.decoded.role)) {
-    return jsonError("Admin access required", 403);
-  }
+  const auth = await authorizeStaff(request, ["guilds.view"]);
+  if ("response" in auth) return auth.response;
   const { id } = await params;
 
   try {
@@ -100,6 +93,9 @@ export async function POST(
     }
     if (body.action !== "set-up" && body.action !== "seal") {
       return jsonError("Unknown action");
+    }
+    if (!auth.permissions.has("guilds.edit_payout_settings")) {
+      return jsonError("You don't have permission to do this", 403);
     }
     const stepUp = await verifyStepUp(
       auth.decoded,

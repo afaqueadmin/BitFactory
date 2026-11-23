@@ -338,8 +338,9 @@ export default function PayoutTrezorCard() {
             Payout approvers
           </Typography>
           <CellNote>
-            Only these admins can prepare, sign or cancel a Trezor payout and
-            seal wallets - the Trezor holder and a stand-in.
+            Only these people can prepare, sign or cancel a Trezor payout and
+            seal wallets - the Trezor holder and a stand-in. The list offers
+            staff whose role allows recording guild payouts.
           </CellNote>
           <Stack>
             {status.admins.map((a) => (

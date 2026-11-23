@@ -11,8 +11,10 @@
  * the first free number for guilds. The admin confirms it.
  */
 
-import { AuditAction, Prisma } from "@prisma/client";
+import { AuditAction, Prisma, type Role } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { effectivePermissions } from "@/lib/auth/permissions";
+import { STAFF_ROLES } from "@/lib/auth/staffRoles";
 import { getPayoutSettings } from "../payoutSettings";
 import {
   MAX_GUILD_ACCOUNT,
@@ -224,19 +226,50 @@ export async function connectPayoutTrezor(params: {
   return { sealAddress, nextTrezorAccount };
 }
 
+/**
+ * Who can be a payout approver: active staff whose permissions include
+ * guilds.record_payout (SUPER_ADMIN always; others through their roles).
+ */
+export async function payoutApproverCandidates() {
+  const staff = await prisma.user.findMany({
+    where: { role: { in: [...STAFF_ROLES] as Role[] }, isDeleted: false },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      role: true,
+      staffRoleAssignments: {
+        select: { role: { select: { permissions: true } } },
+      },
+    },
+    orderBy: { email: "asc" },
+  });
+  return staff
+    .filter((u) =>
+      effectivePermissions(
+        u.role,
+        u.staffRoleAssignments.flatMap((a) =>
+          a.role.permissions.map((p) => p.permission),
+        ),
+      ).has("guilds.record_payout"),
+    )
+    .map(({ id, name, email }) => ({ id, name, email }));
+}
+
 /** Replaces the list of people who may prepare, sign and cancel payouts. */
 export async function setApprovers(userIds: string[], actorId: string) {
   const ids = [...new Set(userIds)];
-  const users = await prisma.user.findMany({
-    where: {
-      id: { in: ids },
-      role: { in: ["ADMIN", "SUPER_ADMIN"] },
-      isDeleted: false,
-    },
-    select: { id: true, email: true },
+  const candidates = new Map(
+    (await payoutApproverCandidates()).map((u) => [u.id, u]),
+  );
+  const users = ids.flatMap((id) => {
+    const u = candidates.get(id);
+    return u ? [{ id: u.id, email: u.email }] : [];
   });
   if (users.length !== ids.length) {
-    throw new TrezorSetupError("Approvers must be admins");
+    throw new TrezorSetupError(
+      "Approvers must be staff who can record guild payouts",
+    );
   }
   await prisma.$transaction(async (tx) => {
     const before = await tx.guildPayoutApprover.findMany({

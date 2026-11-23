@@ -15,7 +15,8 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { requireStaff, jsonError } from "@/lib/guilds/routeAuth";
+import { jsonError } from "@/lib/guilds/routeAuth";
+import { authorizeStaff } from "@/lib/auth/authorization";
 import { verifyStepUp } from "@/lib/auth/stepUp";
 import { trezorErrorMessage } from "@/lib/guilds/trezor/routeErrors";
 import {
@@ -26,14 +27,9 @@ import {
   submitTrezorSignatures,
 } from "@/lib/guilds/trezor/payout";
 
-const ADMIN_ROLES = ["ADMIN", "SUPER_ADMIN"];
-
 export async function GET(request: NextRequest) {
-  const auth = await requireStaff(request);
-  if ("error" in auth) return auth.error;
-  if (!ADMIN_ROLES.includes(auth.decoded.role)) {
-    return jsonError("Admin access required", 403);
-  }
+  const auth = await authorizeStaff(request, ["guilds.view"]);
+  if ("response" in auth) return auth.response;
   const batchId = request.nextUrl.searchParams.get("batchId");
   if (!batchId) return jsonError("batchId is required");
   try {
@@ -50,11 +46,8 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const auth = await requireStaff(request);
-  if ("error" in auth) return auth.error;
-  if (!ADMIN_ROLES.includes(auth.decoded.role)) {
-    return jsonError("Admin access required", 403);
-  }
+  const auth = await authorizeStaff(request, ["guilds.view"]);
+  if ("response" in auth) return auth.response;
 
   try {
     const body = (await request.json().catch(() => ({}))) as {
@@ -77,6 +70,9 @@ export async function POST(request: NextRequest) {
     const actions = ["prepare", "submit-signatures", "cancel"];
     if (!body.action || !actions.includes(body.action)) {
       return jsonError("Unknown action");
+    }
+    if (!auth.permissions.has("guilds.record_payout")) {
+      return jsonError("You don't have permission to do this", 403);
     }
     const batchId = typeof body.batchId === "string" ? body.batchId : "";
     const distributionId =
