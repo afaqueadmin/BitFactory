@@ -8,6 +8,7 @@
 
 import { BulkUnpayDialog } from "@/components/accounting/invoices/BulkUnpayDialog";
 import { isStaffRole } from "@/lib/auth/staffRoles";
+import { can } from "@/lib/auth/can";
 import {
   Alert,
   Box,
@@ -616,22 +617,24 @@ export default function AccountingDashboard() {
         title="Accounting Dashboard"
         description="Overview of invoices, payments, and recurring income"
         actions={
-          <>
-            <Link href="/accounting/bulk-invoices">
-              <Button variant="outlined" sx={ds.outlineBtnSx}>
-                Bulk Create Invoices
-              </Button>
-            </Link>
-            <Link href="/accounting/create">
-              <Button
-                variant="contained"
-                startIcon={<AddIcon />}
-                sx={ds.primaryBtnSx}
-              >
-                Create Invoice
-              </Button>
-            </Link>
-          </>
+          can(user, "invoicing.create") && (
+            <>
+              <Link href="/accounting/bulk-invoices">
+                <Button variant="outlined" sx={ds.outlineBtnSx}>
+                  Bulk Create Invoices
+                </Button>
+              </Link>
+              <Link href="/accounting/create">
+                <Button
+                  variant="contained"
+                  startIcon={<AddIcon />}
+                  sx={ds.primaryBtnSx}
+                >
+                  Create Invoice
+                </Button>
+              </Link>
+            </>
+          )
         }
       />
 
@@ -819,61 +822,69 @@ export default function AccountingDashboard() {
                     onConfirm={() => void handleApplyBulkStatus(true)}
                   />
                 )}
-                <TextField
-                  select
-                  size="small"
-                  label="Bulk status"
-                  value={bulkStatus}
-                  onChange={(e) =>
-                    setBulkStatus(
-                      e.target.value as
-                        "" | "ISSUED" | "PAID" | "OVERDUE" | "CANCELLED",
-                    )
-                  }
-                  sx={{ minWidth: 180 }}
-                  disabled={selectedInvoiceIds.length === 0}
-                >
-                  <MenuItem value="">Select status</MenuItem>
-                  <MenuItem value="ISSUED">Mark as Issued</MenuItem>
-                  <MenuItem value="PAID">Mark as Paid</MenuItem>
-                  <MenuItem value="OVERDUE">Mark as Overdue</MenuItem>
-                  <MenuItem value="CANCELLED">Cancel</MenuItem>
-                </TextField>
-                <Button
-                  variant="outlined"
-                  size="small"
-                  onClick={() => void handleApplyBulkStatus()}
-                  disabled={
-                    !bulkStatus ||
-                    selectedInvoiceIds.length === 0 ||
-                    bulkStatusLoading
-                  }
-                  sx={ds.outlineBtnSx}
-                >
-                  Apply Status
-                </Button>
-                <Button
-                  variant="contained"
-                  size="small"
-                  onClick={() => void handleIssueAndSendSelected()}
-                  disabled={
-                    selectedInvoiceIds.length === 0 || bulkEmailProcessing
-                  }
-                  sx={ds.primaryBtnSx}
-                >
-                  Issue &amp; Send Emails
-                </Button>
-                <Button
-                  variant="outlined"
-                  size="small"
-                  onClick={handleBulkDelete}
-                  disabled={
-                    selectedInvoiceIds.length === 0 || bulkDeleteLoading
-                  }
-                  sx={ds.dangerOutlineBtnSx}
-                >
-                  Delete Selected
-                </Button>
+                {can(user, "invoicing.edit") && (
+                  <>
+                    <TextField
+                      select
+                      size="small"
+                      label="Bulk status"
+                      value={bulkStatus}
+                      onChange={(e) =>
+                        setBulkStatus(
+                          e.target.value as
+                            "" | "ISSUED" | "PAID" | "OVERDUE" | "CANCELLED",
+                        )
+                      }
+                      sx={{ minWidth: 180 }}
+                      disabled={selectedInvoiceIds.length === 0}
+                    >
+                      <MenuItem value="">Select status</MenuItem>
+                      <MenuItem value="ISSUED">Mark as Issued</MenuItem>
+                      <MenuItem value="PAID">Mark as Paid</MenuItem>
+                      <MenuItem value="OVERDUE">Mark as Overdue</MenuItem>
+                      <MenuItem value="CANCELLED">Cancel</MenuItem>
+                    </TextField>
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      onClick={() => void handleApplyBulkStatus()}
+                      disabled={
+                        !bulkStatus ||
+                        selectedInvoiceIds.length === 0 ||
+                        bulkStatusLoading
+                      }
+                      sx={ds.outlineBtnSx}
+                    >
+                      Apply Status
+                    </Button>
+                  </>
+                )}
+                {can(user, "invoicing.send_email") && (
+                  <Button
+                    variant="contained"
+                    size="small"
+                    onClick={() => void handleIssueAndSendSelected()}
+                    disabled={
+                      selectedInvoiceIds.length === 0 || bulkEmailProcessing
+                    }
+                    sx={ds.primaryBtnSx}
+                  >
+                    Issue &amp; Send Emails
+                  </Button>
+                )}
+                {can(user, "invoicing.delete") && (
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    onClick={handleBulkDelete}
+                    disabled={
+                      selectedInvoiceIds.length === 0 || bulkDeleteLoading
+                    }
+                    sx={ds.dangerOutlineBtnSx}
+                  >
+                    Delete Selected
+                  </Button>
+                )}
               </>
             )}
           </Box>

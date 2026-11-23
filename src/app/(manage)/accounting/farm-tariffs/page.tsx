@@ -45,6 +45,8 @@ import { useAccountingVendors } from "@/lib/hooks/usePaymentAccounts";
 import { ConsolidatedPaymentDialog } from "@/components/accounting/common/ConsolidatedPaymentDialog";
 import EditVendorInvoiceModal from "@/components/accounting/EditVendorInvoiceModal";
 import { useDaylight } from "@/lib/daylight";
+import { useUser } from "@/lib/hooks";
+import { can } from "@/lib/auth/can";
 import {
   DaylightAdminPage,
   DaylightLoading,
@@ -54,6 +56,7 @@ import {
 // import { VendorInvoice } from "@/generated/prisma";
 
 export default function FarmTariffs() {
+  const { user } = useUser();
   const { d } = useDaylight();
   const ds = useDaylightAdminSx();
   const [page, setPage] = useState(1);
@@ -194,25 +197,29 @@ export default function FarmTariffs() {
         description="Overview of vendor invoices and payments"
         actions={
           <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
-            <Button
-              variant="outlined"
-              sx={ds.outlineBtnSx}
-              onClick={() => {
-                setConsolidatedNotice(null);
-                setConsolidatedOpen(true);
-              }}
-            >
-              Record Consolidated Payment
-            </Button>
-            <Link href="/accounting/vendor-invoices/create">
+            {can(user, "farm_tariffs.record_payment") && (
               <Button
-                variant="contained"
-                startIcon={<AddIcon />}
-                sx={ds.primaryBtnSx}
+                variant="outlined"
+                sx={ds.outlineBtnSx}
+                onClick={() => {
+                  setConsolidatedNotice(null);
+                  setConsolidatedOpen(true);
+                }}
               >
-                Record Vendor Invoice
+                Record Consolidated Payment
               </Button>
-            </Link>
+            )}
+            {can(user, "farm_tariffs.create") && (
+              <Link href="/accounting/vendor-invoices/create">
+                <Button
+                  variant="contained"
+                  startIcon={<AddIcon />}
+                  sx={ds.primaryBtnSx}
+                >
+                  Record Vendor Invoice
+                </Button>
+              </Link>
+            )}
           </Box>
         }
       />
@@ -576,20 +583,24 @@ export default function FarmTariffs() {
                         )}
                       </TableCell>
                       <TableCell sx={{ textAlign: "center" }}>
-                        <Tooltip title="Edit Invoice">
-                          <IconButton
-                            size="small"
-                            color="primary"
-                            onClick={() => handleEditClick(invoice.id, invoice)}
-                            sx={{
-                              "&:hover": {
-                                backgroundColor: "rgba(25, 118, 210, 0.08)",
-                              },
-                            }}
-                          >
-                            <EditIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
+                        {can(user, "farm_tariffs.edit") && (
+                          <Tooltip title="Edit Invoice">
+                            <IconButton
+                              size="small"
+                              color="primary"
+                              onClick={() =>
+                                handleEditClick(invoice.id, invoice)
+                              }
+                              sx={{
+                                "&:hover": {
+                                  backgroundColor: "rgba(25, 118, 210, 0.08)",
+                                },
+                              }}
+                            >
+                              <EditIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        )}
                       </TableCell>
                     </TableRow>
                   );

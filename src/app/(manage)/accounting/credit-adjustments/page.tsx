@@ -27,6 +27,8 @@ import AddAdjustmentModal from "@/components/AddAdjustmentModal";
 import EditAdjustmentModal from "@/components/EditAdjustmentModal";
 import AdjustmentHistoryDialog from "@/components/AdjustmentHistoryDialog";
 import { useDaylight } from "@/lib/daylight";
+import { useUser } from "@/lib/hooks";
+import { can } from "@/lib/auth/can";
 import {
   DaylightAdminPage,
   useDaylightAdminSx,
@@ -57,6 +59,7 @@ export default function CreditAdjustmentsPage() {
 
 function CreditAdjustmentsContent() {
   const { d, fonts } = useDaylight();
+  const { user } = useUser();
   const ds = useDaylightAdminSx();
   const searchParams = useSearchParams();
 
@@ -177,14 +180,16 @@ function CreditAdjustmentsContent() {
             across customers. Add, edit, or delete an adjustment below.
           </Typography>
         </Box>
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={() => setAddModalOpen(true)}
-          sx={ds.primaryBtnSx}
-        >
-          Add Adjustment
-        </Button>
+        {can(user, "credit_adjustments.create") && (
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={() => setAddModalOpen(true)}
+            sx={ds.primaryBtnSx}
+          >
+            Add Adjustment
+          </Button>
+        )}
       </Box>
 
       {error && (
@@ -288,8 +293,10 @@ function CreditAdjustmentsContent() {
         sortBy={sortBy}
         sortOrder={sortOrder}
         onSortChange={handleSortChange}
-        onEdit={handleEdit}
-        onDelete={handleDelete}
+        onEdit={can(user, "credit_adjustments.edit") ? handleEdit : undefined}
+        onDelete={
+          can(user, "credit_adjustments.delete") ? handleDelete : undefined
+        }
         onViewHistory={handleViewHistory}
       />
 

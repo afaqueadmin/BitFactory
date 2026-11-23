@@ -38,6 +38,8 @@ import { useAccountingVendors } from "@/lib/hooks/usePaymentAccounts";
 import { ConsolidatedPaymentDialog } from "@/components/accounting/common/ConsolidatedPaymentDialog";
 import EditHardwarePurchaseModal from "@/components/accounting/EditHardwarePurchaseModal";
 import { useDaylight } from "@/lib/daylight";
+import { useUser } from "@/lib/hooks";
+import { can } from "@/lib/auth/can";
 import {
   DaylightAdminPage,
   DaylightLoading,
@@ -46,6 +48,7 @@ import {
 } from "@/components/daylight/AdminPage";
 
 export default function HardwarePurchases() {
+  const { user } = useUser();
   const { d } = useDaylight();
   const ds = useDaylightAdminSx();
   const [page, setPage] = useState(1);
@@ -209,25 +212,29 @@ export default function HardwarePurchases() {
         description="Overview of hardware purchase invoices and payments"
         actions={
           <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
-            <Button
-              variant="outlined"
-              sx={ds.outlineBtnSx}
-              onClick={() => {
-                setConsolidatedNotice(null);
-                setConsolidatedOpen(true);
-              }}
-            >
-              Record Consolidated Payment
-            </Button>
-            <Link href="/accounting/hardware-purchases/create">
+            {can(user, "hardware_purchases.record_payment") && (
               <Button
-                variant="contained"
-                startIcon={<AddIcon />}
-                sx={ds.primaryBtnSx}
+                variant="outlined"
+                sx={ds.outlineBtnSx}
+                onClick={() => {
+                  setConsolidatedNotice(null);
+                  setConsolidatedOpen(true);
+                }}
               >
-                Record Hardware Purchase
+                Record Consolidated Payment
               </Button>
-            </Link>
+            )}
+            {can(user, "hardware_purchases.create") && (
+              <Link href="/accounting/hardware-purchases/create">
+                <Button
+                  variant="contained"
+                  startIcon={<AddIcon />}
+                  sx={ds.primaryBtnSx}
+                >
+                  Record Hardware Purchase
+                </Button>
+              </Link>
+            )}
           </Box>
         }
       />
@@ -571,20 +578,24 @@ export default function HardwarePurchases() {
                         )}
                       </TableCell>
                       <TableCell sx={{ textAlign: "center" }}>
-                        <Tooltip title="Edit Invoice">
-                          <IconButton
-                            size="small"
-                            color="primary"
-                            onClick={() => handleEditClick(invoice.id, invoice)}
-                            sx={{
-                              "&:hover": {
-                                backgroundColor: "rgba(25, 118, 210, 0.08)",
-                              },
-                            }}
-                          >
-                            <EditIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
+                        {can(user, "hardware_purchases.edit") && (
+                          <Tooltip title="Edit Invoice">
+                            <IconButton
+                              size="small"
+                              color="primary"
+                              onClick={() =>
+                                handleEditClick(invoice.id, invoice)
+                              }
+                              sx={{
+                                "&:hover": {
+                                  backgroundColor: "rgba(25, 118, 210, 0.08)",
+                                },
+                              }}
+                            >
+                              <EditIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        )}
                       </TableCell>
                     </TableRow>
                   );
