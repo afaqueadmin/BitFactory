@@ -43,6 +43,7 @@ import {
   WalletChangeRequestItem,
 } from "@/lib/hooks/useWalletChangeRequests";
 import { useUser } from "@/lib/hooks/useUser";
+import { can } from "@/lib/auth/can";
 import FreezeCountdown from "@/components/wallet/FreezeCountdown";
 import { useDaylight } from "@/lib/daylight";
 import { asDate, useSortableRows } from "@/components/wallets/useSortableRows";
@@ -426,40 +427,43 @@ export default function WalletChangeRequestsPanel({
                       spacing={1}
                       justifyContent="flex-end"
                     >
-                      {req.status === "PENDING" && (
-                        <Button
-                          sx={ds.primaryBtnSx}
-                          size="small"
-                          variant="contained"
-                          disabled={confirming || rejecting}
-                          onClick={() => setConfirmTarget(req)}
-                        >
-                          Confirm
-                        </Button>
-                      )}
-                      {req.status === "CONFIRMED" && (
-                        <Button
-                          sx={ds.successBtnSx}
-                          size="small"
-                          variant="contained"
-                          disabled={approving || rejecting}
-                          onClick={() => setApproveTarget(req)}
-                        >
-                          Approve
-                        </Button>
-                      )}
-                      {(req.status === "PENDING" ||
-                        req.status === "CONFIRMED") && (
-                        <Button
-                          sx={ds.dangerOutlineBtnSx}
-                          size="small"
-                          variant="outlined"
-                          disabled={confirming || approving || rejecting}
-                          onClick={() => setRejectTarget(req)}
-                        >
-                          Reject
-                        </Button>
-                      )}
+                      {can(user, "wallets.confirm") &&
+                        req.status === "PENDING" && (
+                          <Button
+                            sx={ds.primaryBtnSx}
+                            size="small"
+                            variant="contained"
+                            disabled={confirming || rejecting}
+                            onClick={() => setConfirmTarget(req)}
+                          >
+                            Confirm
+                          </Button>
+                        )}
+                      {can(user, "wallets.approve") &&
+                        req.status === "CONFIRMED" && (
+                          <Button
+                            sx={ds.successBtnSx}
+                            size="small"
+                            variant="contained"
+                            disabled={approving || rejecting}
+                            onClick={() => setApproveTarget(req)}
+                          >
+                            Approve
+                          </Button>
+                        )}
+                      {can(user, "wallets.reject") &&
+                        (req.status === "PENDING" ||
+                          req.status === "CONFIRMED") && (
+                          <Button
+                            sx={ds.dangerOutlineBtnSx}
+                            size="small"
+                            variant="outlined"
+                            disabled={confirming || approving || rejecting}
+                            onClick={() => setRejectTarget(req)}
+                          >
+                            Reject
+                          </Button>
+                        )}
                     </Stack>
                   </TableCell>
                 </TableRow>

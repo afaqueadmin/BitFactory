@@ -39,11 +39,14 @@ import {
   SecondaryLoginRequestError,
   SecondaryLoginRequestItem,
 } from "@/lib/hooks/useSecondaryLoginRequests";
+import { useUser } from "@/lib/hooks";
+import { can } from "@/lib/auth/can";
 
 const STATUSES = ["PENDING", "APPROVED", "REJECTED"];
 
 export default function SecondaryLoginRequestsPage() {
   const ds = useDaylightAdminSx();
+  const { user } = useUser();
   const [status, setStatus] = useState("PENDING");
   const { requests, loading, error, refetch } = useSecondaryLoginRequests(
     status ? { status } : undefined,
@@ -247,29 +250,33 @@ export default function SecondaryLoginRequestsPage() {
                         spacing={1}
                         justifyContent="flex-end"
                       >
-                        <Button
-                          sx={ds.successBtnSx}
-                          size="small"
-                          variant="contained"
-                          onClick={() => handleApprove(req)}
-                          disabled={approving || rejecting}
-                          startIcon={
-                            approvingId === req.id ? (
-                              <CircularProgress size={14} />
-                            ) : undefined
-                          }
-                        >
-                          Approve
-                        </Button>
-                        <Button
-                          sx={ds.dangerOutlineBtnSx}
-                          size="small"
-                          variant="outlined"
-                          onClick={() => setRejectTarget(req)}
-                          disabled={approving || rejecting}
-                        >
-                          Reject
-                        </Button>
+                        {can(user, "signin_email_requests.approve") && (
+                          <Button
+                            sx={ds.successBtnSx}
+                            size="small"
+                            variant="contained"
+                            onClick={() => handleApprove(req)}
+                            disabled={approving || rejecting}
+                            startIcon={
+                              approvingId === req.id ? (
+                                <CircularProgress size={14} />
+                              ) : undefined
+                            }
+                          >
+                            Approve
+                          </Button>
+                        )}
+                        {can(user, "signin_email_requests.reject") && (
+                          <Button
+                            sx={ds.dangerOutlineBtnSx}
+                            size="small"
+                            variant="outlined"
+                            onClick={() => setRejectTarget(req)}
+                            disabled={approving || rejecting}
+                          >
+                            Reject
+                          </Button>
+                        )}
                       </Stack>
                     )}
                   </TableCell>

@@ -27,6 +27,8 @@ import { useStepUp, type StepUpCredentials } from "@/components/StepUpDialog";
 import NoteActionDialog from "@/components/wallets/NoteActionDialog";
 import WalletHistoryDialog from "@/components/wallets/WalletHistoryDialog";
 import { AddressBox } from "@/components/wallets/WalletUi";
+import { useUser } from "@/lib/hooks";
+import { can } from "@/lib/auth/can";
 import { asDate, useSortableRows } from "@/components/wallets/useSortableRows";
 import {
   MISMATCH_STATUS,
@@ -86,6 +88,9 @@ export default function MismatchAlertsTab({
 }) {
   const ds = useDaylightAdminSx();
   const { withStepUp, stepUpDialog } = useStepUp();
+  const { user } = useUser();
+  const canResolve = can(user, "wallets.resolve_mismatch");
+  const canRecheck = can(user, "wallets.recheck");
   const [showAll, setShowAll] = useState(false);
   const [rows, setRows] = useState<Mismatch[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -262,36 +267,42 @@ export default function MismatchAlertsTab({
                     <Stack spacing={0.5} alignItems="flex-end">
                       {m.status === "OPEN" && (
                         <>
-                          <Button
-                            size="small"
-                            onClick={() => {
-                              setError(null);
-                              setTarget({ m, action: "fixed" });
-                            }}
-                            sx={ds.textBtnSx("success")}
-                          >
-                            Luxor has been updated
-                          </Button>
-                          <Button
-                            size="small"
-                            onClick={() => {
-                              setError(null);
-                              setTarget({ m, action: "accept" });
-                            }}
-                            sx={ds.textBtnSx("danger")}
-                          >
-                            Accept Luxor&apos;s address
-                          </Button>
-                          <Button
-                            size="small"
-                            onClick={() => {
-                              setError(null);
-                              setTarget({ m, action: "recheck" });
-                            }}
-                            sx={ds.textBtnSx()}
-                          >
-                            Re-check now
-                          </Button>
+                          {canResolve && (
+                            <>
+                              <Button
+                                size="small"
+                                onClick={() => {
+                                  setError(null);
+                                  setTarget({ m, action: "fixed" });
+                                }}
+                                sx={ds.textBtnSx("success")}
+                              >
+                                Luxor has been updated
+                              </Button>
+                              <Button
+                                size="small"
+                                onClick={() => {
+                                  setError(null);
+                                  setTarget({ m, action: "accept" });
+                                }}
+                                sx={ds.textBtnSx("danger")}
+                              >
+                                Accept Luxor&apos;s address
+                              </Button>
+                            </>
+                          )}
+                          {canRecheck && (
+                            <Button
+                              size="small"
+                              onClick={() => {
+                                setError(null);
+                                setTarget({ m, action: "recheck" });
+                              }}
+                              sx={ds.textBtnSx()}
+                            >
+                              Re-check now
+                            </Button>
+                          )}
                         </>
                       )}
                       <Button

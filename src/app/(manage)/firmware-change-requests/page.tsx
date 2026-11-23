@@ -43,6 +43,7 @@ import {
   FirmwareChangeRequestItem,
 } from "@/lib/hooks/useFirmwareChangeRequests";
 import { useUser } from "@/lib/hooks/useUser";
+import { can } from "@/lib/auth/can";
 import ManageFirmwareOptionsDialog from "@/components/admin/ManageFirmwareOptionsDialog";
 
 const STATUSES = ["PENDING", "CONFIRMED", "APPROVED", "REJECTED"];
@@ -253,13 +254,15 @@ export default function FirmwareChangeRequestsPage() {
             </MenuItem>
           ))}
         </TextField>
-        <Button
-          sx={ds.outlineBtnSx}
-          variant="outlined"
-          onClick={() => setManageOptionsOpen(true)}
-        >
-          Manage Firmware Options
-        </Button>
+        {can(user, "firmware_requests.manage_options") && (
+          <Button
+            sx={ds.outlineBtnSx}
+            variant="outlined"
+            onClick={() => setManageOptionsOpen(true)}
+          >
+            Manage Firmware Options
+          </Button>
+        )}
       </Stack>
 
       {loading ? (
@@ -342,40 +345,43 @@ export default function FirmwareChangeRequestsPage() {
                       spacing={1}
                       justifyContent="flex-end"
                     >
-                      {req.status === "PENDING" && (
-                        <Button
-                          sx={ds.primaryBtnSx}
-                          size="small"
-                          variant="contained"
-                          disabled={confirming || rejecting}
-                          onClick={() => setConfirmTarget(req)}
-                        >
-                          Confirm
-                        </Button>
-                      )}
-                      {req.status === "CONFIRMED" && (
-                        <Button
-                          sx={ds.successBtnSx}
-                          size="small"
-                          variant="contained"
-                          disabled={approving || rejecting}
-                          onClick={() => setApproveTarget(req)}
-                        >
-                          Approve
-                        </Button>
-                      )}
-                      {(req.status === "PENDING" ||
-                        req.status === "CONFIRMED") && (
-                        <Button
-                          sx={ds.dangerOutlineBtnSx}
-                          size="small"
-                          variant="outlined"
-                          disabled={confirming || approving || rejecting}
-                          onClick={() => setRejectTarget(req)}
-                        >
-                          Reject
-                        </Button>
-                      )}
+                      {can(user, "firmware_requests.confirm") &&
+                        req.status === "PENDING" && (
+                          <Button
+                            sx={ds.primaryBtnSx}
+                            size="small"
+                            variant="contained"
+                            disabled={confirming || rejecting}
+                            onClick={() => setConfirmTarget(req)}
+                          >
+                            Confirm
+                          </Button>
+                        )}
+                      {can(user, "firmware_requests.approve") &&
+                        req.status === "CONFIRMED" && (
+                          <Button
+                            sx={ds.successBtnSx}
+                            size="small"
+                            variant="contained"
+                            disabled={approving || rejecting}
+                            onClick={() => setApproveTarget(req)}
+                          >
+                            Approve
+                          </Button>
+                        )}
+                      {can(user, "firmware_requests.reject") &&
+                        (req.status === "PENDING" ||
+                          req.status === "CONFIRMED") && (
+                          <Button
+                            sx={ds.dangerOutlineBtnSx}
+                            size="small"
+                            variant="outlined"
+                            disabled={confirming || approving || rejecting}
+                            onClick={() => setRejectTarget(req)}
+                          >
+                            Reject
+                          </Button>
+                        )}
                     </Stack>
                   </TableCell>
                 </TableRow>
