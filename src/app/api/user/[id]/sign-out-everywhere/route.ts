@@ -10,7 +10,7 @@
  * act on CLIENT and FRANCHISEE accounts, a SUPER_ADMIN also on ADMIN and
  * ACCOUNTING accounts.
  */
-import { staffActorLabel } from "@/lib/auth/staffRoles";
+import { staffActorName } from "@/lib/auth/staffActorName";
 import { NextRequest, NextResponse } from "next/server";
 import { authorizeStaff } from "@/lib/auth/authorization";
 import { AuditAction } from "@prisma/client";
@@ -66,9 +66,7 @@ export async function POST(
           entityType: "User",
           entityId: id,
           userId: actorId,
-          description: `All sessions of ${target.email} signed out by ${staffActorLabel(
-            actor.role,
-          )} ${actor.email}`,
+          description: `All sessions of ${target.email} signed out by ${await staffActorName({ id: actorId, role: actor.role })} ${actor.email}`,
           ipAddress: request.headers.get("x-forwarded-for") || "unknown",
           userAgent: request.headers.get("user-agent") || "unknown",
         },

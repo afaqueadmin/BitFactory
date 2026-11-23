@@ -1,4 +1,4 @@
-import { staffActorLabel } from "@/lib/auth/staffRoles";
+import { staffActorName } from "@/lib/auth/staffActorName";
 import { NextRequest, NextResponse } from "next/server";
 import { authorizeStaff } from "@/lib/auth/authorization";
 import { prisma } from "@/lib/prisma";
@@ -121,9 +121,7 @@ export async function PUT(
         entityType: "User",
         entityId: id,
         userId,
-        description: `Password reset for ${targetLogin.email} by ${staffActorLabel(
-          user.role,
-        )} ${user.email}`,
+        description: `Password reset for ${targetLogin.email} by ${await staffActorName({ id: userId, role: user.role })} ${user.email}`,
         ipAddress: request.headers.get("x-forwarded-for") || "unknown",
         userAgent: request.headers.get("user-agent") || "unknown",
       },
