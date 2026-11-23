@@ -72,6 +72,17 @@ export async function POST(request: NextRequest) {
     }
     const email = canonicalEmail(rawEmail);
 
+    // Staff access comes from custom roles now (/roles): new staff accounts
+    // are STAFF; ADMIN and ACCOUNTING stay only for the undo path.
+    if (role === "ADMIN" || role === "ACCOUNTING") {
+      return NextResponse.json(
+        {
+          error:
+            "Create a Staff account and give it a role on the Roles page instead",
+        },
+        { status: 400 },
+      );
+    }
     const createsStaff = isStaffRole(role);
     if (
       !auth.permissions.has(

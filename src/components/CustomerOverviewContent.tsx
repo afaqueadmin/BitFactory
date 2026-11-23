@@ -70,6 +70,8 @@ interface FetchedUser {
   name: string;
   email: string;
   role: string;
+  /** Custom role names (STAFF accounts). */
+  staffRoles?: string[];
   city: string;
   country: string;
   phoneNumber: string;
@@ -1052,7 +1054,11 @@ export default function CustomerOverviewContent() {
                       </Link>
                     </TableCell>
                     <TableCell>{customer.email}</TableCell>
-                    <TableCell>{customer.role}</TableCell>
+                    <TableCell>
+                      {customer.role === "STAFF" && customer.staffRoles?.length
+                        ? `Staff: ${customer.staffRoles.join(", ")}`
+                        : customer.role}
+                    </TableCell>
                     <TableCell>
                       {customer.segment === "POTENTIAL_CUSTOMER" ? (
                         <DaylightStatusPill
