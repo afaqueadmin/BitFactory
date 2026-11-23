@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verifyJwtToken } from "@/lib/jwt";
 import { ConfirmoPaymentService } from "@/services/confirmoPaymentService";
 import { rejectReadOnly } from "@/lib/guildScope";
+import { getInvoiceForPayer } from "@/lib/accounting/invoicePayerAccess";
+import { prisma } from "@/lib/prisma";
+
+// Both handlers: only the invoice's customer, the customer's franchisee, or
+// staff with invoicing.view (getInvoiceForPayer, same as the Binance routes).
 
 /**
  * POST /api/invoices/[id]/confirmo-payment
@@ -23,23 +27,15 @@ export async function POST(
   try {
     const { id } = await params;
 
-    // Check authentication
-    const token = request.cookies.get("token")?.value;
-    if (!token) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const decoded = await verifyJwtToken(token);
-    if (!decoded?.userId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-    const readOnly = rejectReadOnly(decoded.role);
+    const access = await getInvoiceForPayer(request, id);
+    if ("error" in access) return access.error;
+    const readOnly = rejectReadOnly(access.role);
     if (readOnly) return readOnly;
 
     console.log("Creating Confirmo payment for invoice:", id);
 
     const service = new ConfirmoPaymentService();
-    const result = await service.createPaymentForInvoice(id, decoded.userId);
+    const result = await service.createPaymentForInvoice(id, access.userId);
 
     return NextResponse.json(result);
   } catch (error: unknown) {
@@ -67,15 +63,8 @@ export async function GET(
   try {
     const { id } = await params;
 
-    // Check authentication
-    const token = request.cookies.get("token")?.value;
-    if (!token) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    await verifyJwtToken(token);
-
-    const { prisma } = await import("@/lib/prisma");
+    const access = await getInvoiceForPayer(request, id);
+    if ("error" in access) return access.error;
 
     const payment = await prisma.confirmoPayment.findUnique({
       where: { invoiceId: id },
