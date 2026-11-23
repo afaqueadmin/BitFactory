@@ -17,7 +17,6 @@ import {
   requirePermission,
 } from "@/lib/auth/authorization";
 import { AuditAction } from "@prisma/client";
-import { franchiseeUserFilter } from "@/lib/franchiseeScope";
 import { credentialLabel } from "@/lib/poolAuthMask";
 
 /**
@@ -45,12 +44,10 @@ export async function GET(
 
     const ctx = await getAuthorizationContext(request);
     if ("response" in ctx) return ctx.response;
-    // Shared: a franchisee sees only their own customers (franchiseeUserFilter).
-    if (ctx.role !== "FRANCHISEE") {
-      const denied = requirePermission(ctx, "customer_groups.view");
-      if (denied) return denied;
-    }
-    const user = { userId: ctx.userId, role: ctx.role };
+    // Staff only (O6): no franchise screen uses this route, and the member
+    // list was never filtered for franchisees.
+    const denied = requirePermission(ctx, "customer_groups.view");
+    if (denied) return denied;
 
     // Fetch group with subaccounts (via poolAuth -> user relation, or
     // directly via userId for subaccount-less members) and creator
@@ -166,7 +163,6 @@ export async function GET(
       where: {
         user: {
           isDeleted: false,
-          ...franchiseeUserFilter({ id: user.userId, role: user.role }),
         },
       },
       select: {
@@ -218,7 +214,6 @@ export async function GET(
         isDeleted: false,
         poolAuths: { none: {} },
         id: { notIn: Array.from(groupedUserIds) },
-        ...franchiseeUserFilter({ id: user.userId, role: user.role }),
       },
       select: {
         id: true,
