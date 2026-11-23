@@ -393,13 +393,8 @@ export default function CreateUserModal({
               >
                 <MenuItem value="CLIENT">Client</MenuItem>
                 <MenuItem value="SIMULATED">Simulated</MenuItem>
-                {can(user, "customers.create_staff") && (
-                  <MenuItem value="ADMIN">Admin</MenuItem>
-                )}
-                {can(user, "customers.create_staff") && (
-                  <MenuItem value="ACCOUNTING">Accounting</MenuItem>
-                )}
-                {/* Staff: no access of its own; give it roles on /roles. */}
+                {/* Staff: no access of its own; give it roles on /roles
+                    ("Admin", "Accounting" or a narrower one). */}
                 {can(user, "customers.create_staff") && (
                   <MenuItem value="STAFF">Staff</MenuItem>
                 )}

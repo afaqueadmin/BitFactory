@@ -93,6 +93,10 @@ export async function GET(request: NextRequest) {
           isDeleted: true,
           franchiseeId: true,
           segment: true,
+          // Custom role names, shown next to STAFF in the list.
+          staffRoleAssignments: {
+            select: { role: { select: { name: true } } },
+          },
           _count: {
             select: { miners: { where: { isDeleted: false } } },
           },
@@ -143,6 +147,7 @@ export async function GET(request: NextRequest) {
         email: user.email,
         name: user.name || "N/A",
         role: user.role,
+        staffRoles: user.staffRoleAssignments.map((a) => a.role.name),
         city: user.city || "N/A",
         country: user.country || "N/A",
         phoneNumber: user.phoneNumber || "N/A",
