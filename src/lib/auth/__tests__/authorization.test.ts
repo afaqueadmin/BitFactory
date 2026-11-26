@@ -40,8 +40,8 @@ function userRow(role: string, rolePermissions: string[][] = []) {
 }
 
 describe("catalogue", () => {
-  it("matches the reviewed catalogue: 176 permissions, 14 SA-only", () => {
-    expect(ALL_PERMISSIONS).toHaveLength(176);
+  it("matches the reviewed catalogue: 208 permissions, 14 SA-only", () => {
+    expect(ALL_PERMISSIONS).toHaveLength(208);
     expect(SA_ONLY.size).toBe(14);
     for (const p of SA_ONLY) expect(PERMISSIONS).toHaveProperty(p);
     for (const p of ALL_PERMISSIONS) expect(p).toMatch(/^[a-z_]+\.[a-z_]+$/);
@@ -50,13 +50,13 @@ describe("catalogue", () => {
 
 describe("effectivePermissions", () => {
   it("gives SUPER_ADMIN every permission", () => {
-    expect(effectivePermissions("SUPER_ADMIN").size).toBe(176);
+    expect(effectivePermissions("SUPER_ADMIN").size).toBe(208);
   });
 
   it("gives ADMIN and ACCOUNTING everything except SA-only (today's access)", () => {
     for (const role of ["ADMIN", "ACCOUNTING"]) {
       const perms = effectivePermissions(role);
-      expect(perms.size).toBe(176 - 14);
+      expect(perms.size).toBe(208 - 14);
       for (const p of SA_ONLY) expect(perms.has(p)).toBe(false);
     }
   });

@@ -50,7 +50,7 @@ describe("parseRoleBody", () => {
 describe("STAFF system role", () => {
   it("with every grantable permission equals ADMIN (the Admin/Accounting move)", () => {
     const grantable = ALL_PERMISSIONS.filter((p) => !SA_ONLY.has(p));
-    expect(grantable).toHaveLength(162);
+    expect(grantable).toHaveLength(194);
     expect([...effectivePermissions("STAFF", grantable)].sort()).toEqual(
       [...effectivePermissions("ADMIN", [])].sort(),
     );

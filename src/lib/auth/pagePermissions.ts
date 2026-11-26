@@ -84,8 +84,11 @@ const RULES: Rule[] = [
   // every named /accounting page.
   [new RegExp(`^/accounting/${ID}$`), ["invoicing.view"]],
   // Dashboard
-  [exact("/admin/monthly-customer-billing"), ["dashboard.view"]],
-  [exact("/admin/customer-balance"), ["dashboard.view"]],
+  [
+    exact("/admin/monthly-customer-billing"),
+    ["dashboard_balances.monthly_billing"],
+  ],
+  [exact("/admin/customer-balance"), ["dashboard_balances.total_balance"]],
   // Work Queue
   [under("/tickets"), ["tickets.view"]],
   [exact("/hashrate-alerts"), ["hashrate_alerts.view"]],
