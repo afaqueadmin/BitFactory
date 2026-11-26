@@ -15,7 +15,7 @@ import { buildOrderBy, parseCustomerBalanceQuery } from "./query";
  */
 export async function GET(request: NextRequest) {
   try {
-    const auth = await authorizeStaff(request, ["dashboard.view"]);
+    const auth = await authorizeStaff(request, ["dashboard_balances.total_balance"]);
     if ("response" in auth) return auth.response;
 
     const url = new URL(request.url);

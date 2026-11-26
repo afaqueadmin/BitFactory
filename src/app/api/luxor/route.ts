@@ -23,6 +23,7 @@
 
 import { isStaffRole } from "@/lib/auth/staffRoles";
 import { requireStaffPermission } from "@/lib/auth/authorization";
+import { DASHBOARD_CARD_PERMISSIONS } from "@/lib/auth/permissions";
 import { NextRequest, NextResponse } from "next/server";
 import { verifyJwtToken } from "@/lib/jwt";
 import { createLuxorClient, LuxorError } from "@/lib/luxor";
@@ -399,7 +400,10 @@ export async function GET(
       const denied = await requireStaffPermission(request, [
         "subaccounts.view",
         "pool_workers.view",
-        "dashboard.view",
+        // The dashboard calls this route for its pool cards (caller's cookie).
+        ...DASHBOARD_CARD_PERMISSIONS.filter((p) =>
+          /^dashboard_(operations|customers|mining)\./.test(p),
+        ),
         "miners.view",
         "customers.view", // HostedMinersList on the customer page
         "customers.create", // Luxor subaccount picker in the account dialogs

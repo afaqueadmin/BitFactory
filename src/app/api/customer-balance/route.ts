@@ -1,20 +1,18 @@
-import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
-import { requireStaffPermission } from "@/lib/auth/authorization";
-import { prisma } from "@/lib/prisma";
-import { NON_BALANCE_PAYMENT_TYPES } from "@/lib/accounting/paymentTypes";
 import { verifyJwtToken } from "@/lib/jwt";
-import { franchiseeUserFilter } from "@/lib/franchiseeScope";
+import { customerBalanceTotals } from "@/lib/accounting/dashboardTotals";
 
+/**
+ * Balance totals of a franchisee's own customers (franchise dashboard).
+ * Staff read the same totals from /api/admin/dashboard, per card permission.
+ */
 export async function GET(request: NextRequest) {
   try {
     const token = request.cookies.get("token")?.value;
-
     if (!token) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Verify token and extract user ID and role
     let userId: string;
     let userRole: string;
     try {
@@ -26,93 +24,12 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Check if user is admin, super admin, or franchisee
-    if (!isStaffRole(userRole) && userRole !== "FRANCHISEE") {
+    if (userRole !== "FRANCHISEE") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    if (isStaffRole(userRole)) {
-      const denied = await requireStaffPermission(request, ["dashboard.view"]);
-      if (denied) return denied;
-    }
 
-    // Query cost_payments table and aggregate by userId
-    const costPayments = await prisma.costPayment.groupBy({
-      by: ["userId"],
-      where: { type: { notIn: NON_BALANCE_PAYMENT_TYPES }, isDeleted: false },
-      _sum: {
-        amount: true,
-      },
-    });
-
-    // Fetch user details (userId, email, name) for each userId
-    const userIds = costPayments.map((payment) => payment.userId);
-    const users = await prisma.user.findMany({
-      where: {
-        id: { in: userIds },
-        isDeleted: false,
-        poolAuths: { none: { authKey: { contains: "higgs_test" } } },
-        ...franchiseeUserFilter({ id: userId, role: userRole }),
-      },
-      select: {
-        id: true,
-        email: true,
-        name: true,
-      },
-    });
-
-    // Create a map of userId to user details
-    const userMap = new Map(users.map((user) => [user.id, user]));
-
-    // Calculate aggregates and build customer balance list
-    let totalPositiveBalance = 0;
-    let totalNegativeBalance = 0;
-    let positiveCustomerCount = 0;
-    let negativeCustomerCount = 0;
-    // const customerBalances: Array<{
-    //   userId: string;
-    //   email: string | null;
-    //   name: string | null;
-    //   balance: number;
-    // }> = [];
-    //
-    costPayments.forEach((payment) => {
-      const userDetails = userMap.get(payment.userId);
-      if (!userDetails) return; // Ignores test users
-      const aggregatedAmount = Number(payment._sum.amount!.toFixed(2));
-
-      // customerBalances.push({
-      //   userId: payment.userId,
-      //   email: userDetails.email,
-      //   name: userDetails.name,
-      //   balance: aggregatedAmount,
-      // });
-
-      if (aggregatedAmount >= 0) {
-        totalPositiveBalance += aggregatedAmount;
-        positiveCustomerCount += 1;
-      } else if (aggregatedAmount < 0) {
-        totalNegativeBalance += aggregatedAmount;
-        negativeCustomerCount += 1;
-      }
-    });
-
-    console.log(
-      `[Customer Balance GET] Aggregated balances - Positive: ${totalPositiveBalance}, Negative: ${totalNegativeBalance}`,
-    );
-
-    return NextResponse.json(
-      {
-        success: true,
-        data: {
-          totalPositiveBalance,
-          totalNegativeBalance,
-          positiveCustomerCount,
-          negativeCustomerCount,
-          // customerBalances,
-        },
-      },
-      { status: 200 },
-    );
+    const data = await customerBalanceTotals({ id: userId, role: userRole });
+    return NextResponse.json({ success: true, data }, { status: 200 });
   } catch (error) {
     console.error("[Customer Balance GET] Error fetching balance:", error);
     return NextResponse.json(

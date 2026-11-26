@@ -7,11 +7,79 @@
  * No database access: safe to import anywhere, including the browser.
  */
 export const PERMISSIONS = {
-  // dashboard
-  "dashboard.view": {
-    label:
-      "Company totals, monthly customer billing, customer balances, and their PDFs",
+  // Dashboard (/adminpanel): one permission per card, one module per group,
+  // so /roles shows a group checkbox plus a checkbox per card.
+  "dashboard_operations.miners": { label: "Miners card" },
+  "dashboard_operations.spaces": { label: "Spaces card" },
+  "dashboard_operations.power": { label: "Power card" },
+  "dashboard_operations.uptime": { label: "Uptime (24 hours) card" },
+  "dashboard_operations.hashrate_five_min": { label: "Hashrate (5 min) card" },
+  "dashboard_operations.hashrate_one_day": {
+    label: "Hashrate (24 hours) card",
   },
+  "dashboard_operations.total_workers": { label: "Total Workers card" },
+  "dashboard_operations.active_workers": { label: "Active Workers card" },
+  "dashboard_operations.inactive_workers": { label: "Inactive Workers card" },
+  "dashboard_customers.customers": {
+    label: "Customers card (active / inactive)",
+  },
+  "dashboard_customers.total_customers": { label: "Total Customers card" },
+  "dashboard_customers.total_pool_accounts": {
+    label: "Total Pool Accounts card",
+  },
+  "dashboard_customers.active_pool_accounts": {
+    label: "Active Pool Accounts card",
+  },
+  "dashboard_customers.inactive_pool_accounts": {
+    label: "Inactive Pool Accounts card",
+  },
+  "dashboard_mining.customer_mined_revenue": {
+    label: "Total Customer Mined Revenue card",
+  },
+  "dashboard_mining.self_mining_revenue_btc": {
+    label: "Self Mining Revenue (BTC) card",
+  },
+  "dashboard_mining.self_mining_revenue_usd": {
+    label: "Self Mining Revenue (USD) card",
+  },
+  "dashboard_mining.self_mining_hosting_cost": {
+    label: "Self Mining Hosting Cost card",
+  },
+  "dashboard_mining.self_mining_profit": { label: "Self Mining Profit card" },
+  "dashboard_balances.monthly_billing": {
+    label:
+      "Monthly Customer Billing card, its page /admin/monthly-customer-billing and PDF",
+  },
+  "dashboard_balances.total_balance": {
+    label:
+      "Total Customer Balance card, its page /admin/customer-balance and PDF",
+  },
+  "dashboard_balances.positive_balance": {
+    label: "Positive Customer Balance card",
+  },
+  "dashboard_balances.negative_balance": {
+    label: "Negative Customer Balance card",
+  },
+  "dashboard_balances.positive_balance_customers": {
+    label: "Positive Balance Customers card",
+  },
+  "dashboard_balances.negative_balance_customers": {
+    label: "Negative Balance Customers card",
+  },
+  "dashboard_finance.hosting_revenue": {
+    label: "Hosting and Colocation (Invoice) card",
+  },
+  "dashboard_finance.hosting_cost": { label: "Hosting Cost (Invoice) card" },
+  "dashboard_finance.hosting_profit": {
+    label: "Hosting Profit (Invoice) card",
+  },
+  "dashboard_finance.hardware_revenue": { label: "Hardware Revenue card" },
+  "dashboard_finance.hardware_revenue_pending": {
+    label: "Hardware Revenue Pending card",
+  },
+  "dashboard_finance.hardware_cost": { label: "Hardware Cost card" },
+  "dashboard_finance.security_deposit": { label: "Security Deposit card" },
+  "dashboard_finance.hardware_profit": { label: "Hardware Profit card" },
   // tickets
   "tickets.view": { label: "List and open tickets" },
   "tickets.reply": { label: "Post a message on a ticket" },
@@ -432,6 +500,11 @@ export const PERMISSIONS = {
 export type Permission = keyof typeof PERMISSIONS;
 
 export const ALL_PERMISSIONS = Object.keys(PERMISSIONS) as Permission[];
+
+/** Every dashboard card permission: holding any one opens the dashboard. */
+export const DASHBOARD_CARD_PERMISSIONS = ALL_PERMISSIONS.filter((p) =>
+  p.startsWith("dashboard_"),
+);
 
 /** Today only a SUPER_ADMIN may do these. Custom roles can never grant them. */
 export const SA_ONLY: ReadonlySet<Permission> = new Set<Permission>([

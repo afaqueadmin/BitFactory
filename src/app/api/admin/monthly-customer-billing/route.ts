@@ -14,7 +14,7 @@ import { buildOrderBy, parseMonthlyBillingQuery } from "./query";
  */
 export async function GET(request: NextRequest) {
   try {
-    const auth = await authorizeStaff(request, ["dashboard.view"]);
+    const auth = await authorizeStaff(request, ["dashboard_balances.monthly_billing"]);
     if ("response" in auth) return auth.response;
 
     const url = new URL(request.url);

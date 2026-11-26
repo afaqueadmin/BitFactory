@@ -263,7 +263,7 @@ const ROUTES: ParityRow[] = [
     permissions: [
       "subaccounts.view",
       "pool_workers.view",
-      "dashboard.view",
+      "dashboard_operations.miners",
       "miners.view",
       "customers.view",
       "customers.create",
@@ -1462,13 +1462,13 @@ const ROUTES: ParityRow[] = [
   {
     route: "admin/customer-balance/pdf",
     method: "GET",
-    permissions: ["dashboard.view"],
+    permissions: ["dashboard_balances.total_balance"],
     today: "staff",
   },
   {
     route: "admin/customer-balance",
     method: "GET",
-    permissions: ["dashboard.view"],
+    permissions: ["dashboard_balances.total_balance"],
     today: "staff",
   },
   {
@@ -1498,31 +1498,19 @@ const ROUTES: ParityRow[] = [
   {
     route: "admin/dashboard",
     method: "GET",
-    permissions: ["dashboard.view"],
+    permissions: ["dashboard_operations.miners"],
     today: "staff",
   },
   {
     route: "admin/monthly-customer-billing/pdf",
     method: "GET",
-    permissions: ["dashboard.view"],
+    permissions: ["dashboard_balances.monthly_billing"],
     today: "staff",
   },
   {
     route: "admin/monthly-customer-billing",
     method: "GET",
-    permissions: ["dashboard.view"],
-    today: "staff",
-  },
-  {
-    route: "cost-payments/hardwareRevenue",
-    method: "GET",
-    permissions: ["dashboard.view"],
-    today: "staff",
-  },
-  {
-    route: "cost-payments/hostingRevenue",
-    method: "GET",
-    permissions: ["dashboard.view"],
+    permissions: ["dashboard_balances.monthly_billing"],
     today: "staff",
   },
   {
@@ -2010,7 +1998,8 @@ const ROUTES: ParityRow[] = [
       "memos.create",
       "recurring_invoices.view",
       "recurring_invoices.manage",
-      "dashboard.view",
+      "dashboard_balances.total_balance",
+      "dashboard_balances.monthly_billing",
     ],
     today: "staff",
     shared: true,
@@ -2019,13 +2008,6 @@ const ROUTES: ParityRow[] = [
     route: "accounting/statements/customers",
     method: "GET",
     permissions: ["customer_statements.view"],
-    today: "staff",
-    shared: true,
-  },
-  {
-    route: "customer-balance",
-    method: "GET",
-    permissions: ["dashboard.view"],
     today: "staff",
     shared: true,
   },

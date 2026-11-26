@@ -40,7 +40,8 @@ export async function GET(request: NextRequest) {
         "memos.create",
         "recurring_invoices.view",
         "recurring_invoices.manage",
-        "dashboard.view",
+        "dashboard_balances.total_balance",
+        "dashboard_balances.monthly_billing",
       ]);
       if (denied) return denied;
     }
